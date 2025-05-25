@@ -1,0 +1,28 @@
+.input {
+  color: var(--foreground);
+  background: var(--background);
+
+  &:hover {
+    filter: brightness(.9);
+  }
+
+  &:active {
+    filter: brightness(.8);
+  }
+
+  &:disabled {
+    filter: brightness(.7);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:valid, &:user-valid, &:in-range {
+    border-bottom: .125em solid green;
+  }
+
+  &:invalid, &:user-invalid, &:out-of-range {
+    border-bottom: .125em solid red;
+  }
+}

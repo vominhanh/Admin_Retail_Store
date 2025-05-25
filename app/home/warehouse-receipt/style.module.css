@@ -1,0 +1,13 @@
+.image-container {
+  width: 30%;
+}
+
+.order-form-product-table {
+  grid-template-columns: 1fr 6fr 2fr 2fr;
+  gap: 12px;
+}
+
+.warehouse-receipt-product-table {
+  grid-template-columns: 1fr 6fr 2fr 2fr 4fr;
+  gap: 12px;
+}

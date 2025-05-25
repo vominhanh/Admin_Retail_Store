@@ -1,0 +1,51 @@
+.nav {
+  background: lch(from var(--background) calc(l + var(--brightness-different) * var(--brightness-different-scale)) c h);
+  transition: width 0.3s ease-in-out;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+}
+
+.main {
+  background: var(--background);
+  transition: all 0.3s ease;
+}
+
+.box {
+  border-width: 1;
+  border-style: solid;
+  border-color: var(--foreground);
+}
+
+/* Animation cho các item trong navigation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Animation khi mở rộng */
+@keyframes expandNav {
+  from {
+    width: calc(24px + 16px * 2 + 8px * 2);
+  }
+
+  to {
+    width: auto;
+  }
+}
+
+/* Animation khi thu gọn */
+@keyframes collapseNav {
+  from {
+    width: auto;
+  }
+
+  to {
+    width: calc(24px + 16px * 2 + 8px * 2);
+  }
+}

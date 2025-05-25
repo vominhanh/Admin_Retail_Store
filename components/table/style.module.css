@@ -1,0 +1,16 @@
+.resize-handle {
+  border-right: 2px solid transparent;
+
+  &:hover {
+    border-color: lch(from var(--foreground) calc(l - var(--brightness-different)) c h);
+  }
+}
+
+.active {
+  border-color: lch(from var(--foreground) calc(l - var(--brightness-different)) c h);
+}
+
+.row {
+  border-top-width: .8px;
+  border-top-color: color-mix(in oklab, #fff 10%, transparent);
+}

@@ -1,0 +1,10 @@
+.overlay {
+  background: lch(from var(--gradient-background) l c h / 0.2);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+}
+
+.modal {
+  background: var(--gradient-background);
+  z-index: 50;
+}

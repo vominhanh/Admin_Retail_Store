@@ -1,0 +1,13 @@
+.unchecked {
+  background: lch(from var(--background) calc(l + var(--brightness-different) * var(--brightness-different-scale)) c h);
+  color: var(--foreground);
+}
+
+.checked {
+  background: #0000ffff;
+  color: #ffffffff;
+}
+
+.image {
+  filter: invert(1);
+}

@@ -1,0 +1,6 @@
+const SECOND_TO_MILISECONDS: number = 100;
+const MINUTE_TO_SECONDS: number = 60;
+const HOUR_TO_MINUTES: number = 60;
+const DAY_TO_HOURS: number = 24;
+const MONTH_TO_DAYS: number = 30;
+export const COOKIE_MAX_AGE: number = MONTH_TO_DAYS * DAY_TO_HOURS * HOUR_TO_MINUTES * MINUTE_TO_SECONDS * SECOND_TO_MILISECONDS;

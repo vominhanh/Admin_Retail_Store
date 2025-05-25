@@ -1,0 +1,160 @@
+.container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 10px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.notification {
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  padding: 18px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  animation: fadeInUp 0.35s;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 4px;
+  color: inherit;
+}
+
+.message {
+  font-size: 14px;
+  color: inherit;
+}
+
+.iconWrapper {
+  display: flex;
+  align-items: flex-start;
+  margin-right: 10px;
+}
+
+.closeButtonWrapper {
+  margin-left: 10px;
+}
+
+.closeButton {
+  font-size: 20px;
+  padding: 4px;
+  opacity: 0.8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.closeButton:hover {
+  opacity: 1;
+}
+
+.slide-in {
+  animation-name: slideIn;
+}
+
+.slide-out {
+  animation-name: slideOut;
+}
+
+.shrink {
+  animation: shrink 0.3s forwards;
+}
+
+.info {
+  color: #1890ff;
+  background: linear-gradient(90deg, #e6f7ff 80%, #d6eaff 100%);
+  border-left: 5px solid #1890ff;
+}
+
+.success {
+  color: #389e0d;
+  background: linear-gradient(90deg, #f6ffed 80%, #eaffea 100%);
+  border-left: 5px solid #52c41a;
+}
+
+.error {
+  color: #d32029;
+  background: linear-gradient(90deg, #fff1f0 80%, #ffeaea 100%);
+  border-left: 5px solid #f5222d;
+}
+
+.warning {
+  color: #faad14;
+  background: linear-gradient(90deg, #fffbe6 80%, #fff7d6 100%);
+  border-left: 5px solid #faad14;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes shrink {
+  from {
+    max-height: 100px;
+    margin-bottom: 10px;
+    opacity: 1;
+  }
+
+  to {
+    max-height: 0px;
+    margin-bottom: 0px;
+    opacity: 0;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .info {
+    background-color: rgba(24, 144, 255, 0.15);
+  }
+
+  .success {
+    background-color: rgba(82, 196, 26, 0.15);
+  }
+
+  .error {
+    background-color: rgba(245, 34, 45, 0.15);
+  }
+
+  .warning {
+    background-color: rgba(250, 173, 20, 0.15);
+  }
+}

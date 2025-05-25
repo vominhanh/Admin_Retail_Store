@@ -1,0 +1,315 @@
+.image-container {
+  width: 30%;
+}
+
+/* New Product Detail Page Styles */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: #f9fafb;
+  min-height: 100vh;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #4b5563;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  margin-top: 0.25rem;
+}
+
+.backButton:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+  border-color: #d1d5db;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.productId {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.contentWrapper {
+  background-color: white;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.productGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .productGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Image Section */
+.imageSection {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+@media (min-width: 768px) {
+  .imageSection {
+    border-right: 1px solid #f3f4f6;
+    border-bottom: none;
+  }
+}
+
+.mainImageContainer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: white;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.mainImage {
+  object-fit: contain;
+}
+
+.thumbnailContainer {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.thumbnail {
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.activeThumbnail {
+  border-color: #3b82f6;
+}
+
+.thumbnailImage {
+  object-fit: cover;
+}
+
+.noImageContainer {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f3f4f6;
+  border-radius: 0.375rem;
+  color: #9ca3af;
+}
+
+/* Details Section */
+.detailsSection {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.productBasicInfo {
+  margin-bottom: 1.5rem;
+}
+
+.productName {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.productDescription {
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.detailsList {
+  border-top: 1px solid #f3f4f6;
+  padding-top: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detailItem {
+  display: flex;
+  align-items: center;
+}
+
+.detailLabel {
+  min-width: 8rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.detailValue {
+  color: #111827;
+  font-size: 0.9375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.priceInput {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.priceOutput {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.timestampSection {
+  margin-top: auto;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.timestampItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.timestampLabel {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.timestampValue {
+  background-color: #f3f4f6;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  color: #374151;
+}
+
+/* Error handling */
+.errorContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  width: 100%;
+}
+
+.errorMessage {
+  max-width: 500px;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.errorMessage h2 {
+  color: #ef4444;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.errorMessage p {
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+.retryButton {
+  background-color: #3b82f6;
+  color: white;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.retryButton:hover {
+  background-color: #2563eb;
+}
+
+/* Link icon */
+.linkIcon {
+  display: inline-flex;
+  color: #6b7280;
+  transition: color 0.2s;
+  margin-right: 0.5rem;
+}
+
+.linkIcon:hover {
+  color: #3b82f6;
+}
+
+.inventorySection {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.75rem;
+}
+
+.quantityOnShelf {
+  color: #0ea5e9;
+  font-weight: 500;
+}
+
+.quantityRemaining {
+  color: #8b5cf6;
+  font-weight: 500;
+}
+
+.inventoryLabel {
+  font-size: 0.7rem;
+  color: #6b7280;
+  margin-left: 0.5rem;
+  font-weight: normal;
+}

@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+  --background: #eeeeeeff;
+  --foreground: #121212ff;
+  --is-dark: 0;
+
+  --brightness-different: 50;
+  --brightness-different-scale: 1 / 10;
+  --gradient-background: linear-gradient(
+    to right, 
+    lch(
+      from var(--background) 
+      calc(l - var(--brightness-different) * var(--brightness-different-scale)) 
+      c 
+      h
+    ), 
+    lch(
+      from var(--background) 
+      calc(l + var(--brightness-different) * var(--brightness-different-scale)) 
+      c 
+      h
+    )
+  );
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121212ff;
+    --foreground: #eeeeeeff;
+    --is-dark: 1;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

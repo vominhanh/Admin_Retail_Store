@@ -1,0 +1,10 @@
+.tab-list {
+	border-bottom-color: lch(
+		from var(--foreground) 
+		calc(l - var(--brightness-different)) c h
+	);
+}
+
+.active-tab {
+	border-bottom-color: green;
+}

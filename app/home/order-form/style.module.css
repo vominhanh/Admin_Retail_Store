@@ -1,0 +1,37 @@
+.image-container {
+  width: 30%;
+}
+
+.good-receipt-product-table {
+  grid-template-columns: 1fr 6fr 2fr 2fr 1fr;
+  gap: 12px;
+}
+
+.good-receipt-product-table-with-price {
+  grid-template-columns: 0.5fr 3fr 1.5fr 1.5fr 1fr 0.5fr;
+  gap: 0.75rem;
+}
+
+.good-receipt-product-table-without-price {
+  grid-template-columns: 50px 1fr 1fr 100px 80px;
+}
+
+/* Container chứa danh sách sản phẩm và nút thêm */
+.product-form-container {
+  position: relative;
+  padding-bottom: 80px;
+  /* Để trống cho nút thêm */
+  min-height: 400px;
+}
+
+/* Style cho nút thêm cố định */
+.sticky-add-button {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 800px;
+  z-index: 900;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}

@@ -1,0 +1,47 @@
+.button {
+  background: var(--button-color);
+}
+
+.info {
+  --button-color: #0000ffff;
+}
+
+.error {
+  --button-color: #ff0000ff;
+}
+
+.danger {
+  --button-color: #ffff00ff;
+}
+
+.warning {
+  --button-color: #ffa500ff;
+}
+
+.success {
+  --button-color: #00ff00ff;
+}
+
+.transparent {
+  --button-color: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+  .info, .success, .danger {
+    background: lch(from var(--button-color) calc(l - var(--brightness-different)) c h);
+  }
+}
+
+.button:not(.loading) {
+  &:hover {
+    filter: brightness(.9);
+  }
+
+  &:active {
+    filter: brightness(.8);
+  }
+
+  &:disabled {
+    filter: grayscale(1);
+  }
+}
