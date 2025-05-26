@@ -12,6 +12,33 @@ export default function PaymentSuccess() {
     const [paymentInfo, setPaymentInfo] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [employeeName, setEmployeeName] = useState<string>('Chưa xác định');
+
+    useEffect(() => {
+        const fetchEmployee = async () => {
+            try {
+                const response = await fetch('/api/auth/me');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch employee');
+                }
+                const data = await response.json();
+                const accountId = data._id;
+
+                const userResponse = await fetch(`/api/user/account/${accountId}`);
+                if (!userResponse.ok) {
+                    throw new Error('Failed to fetch user details');
+                }
+
+                const userData = await userResponse.json();
+                setEmployeeName(userData.name || 'Chưa xác định');
+            } catch (err) {
+                console.error('Error fetching employee:', err);
+                setEmployeeName('Chưa xác định');
+            }
+        };
+
+        fetchEmployee();
+    }, []);
 
     useEffect(() => {
         const saveOrder = async () => {
@@ -156,6 +183,14 @@ export default function PaymentSuccess() {
                                             currency: 'VND'
                                         }).format(Number(paymentInfo.amount))}
                                     </dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-sm font-medium text-gray-500">Nhân viên phụ trách:</dt>
+                                    <dd className="text-sm text-gray-900">{employeeName}</dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-sm font-medium text-gray-500">Hình thức thanh toán:</dt>
+                                    <dd className="text-sm text-gray-900">{paymentInfo.order?.paymentMethod || 'Ví MoMo'}</dd>
                                 </div>
                             </dl>
                         </div>

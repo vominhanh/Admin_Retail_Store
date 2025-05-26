@@ -1288,20 +1288,8 @@ export default function CreateOrder() {
                                                 <option value="transfer">Chuyển khoản ngân hàng</option>
                                                 <option value="momo">Ví MoMo</option>
                                             </select>
-                                            {paymentMethod === 'momo' && (
-                                                <div className="mt-3">
-                                                    <Button onClick={handleMoMoPayment} isDisable={isCreatingMomo}>
-                                                        {isCreatingMomo ? 'Đang tạo link MoMo...' : 'Thanh toán với MoMo'}
-                                                    </Button>
-                                                    {momoPaymentUrl && (
-                                                        <div className="mt-2">
-                                                            <a href={momoPaymentUrl} target="_blank" rel="noopener noreferrer" className="text-pink-600 underline">
-                                                                Mở lại trang thanh toán MoMo
-                                                            </a>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+
+
                                         </div>
                                         <div className="col-span-3">
                                             <label className="block text-lg text-slate-600 mb-1.5">
@@ -1375,19 +1363,45 @@ export default function CreateOrder() {
                             {isSavingDraft ? 'Đang lưu...' : 'Lưu nháp'}
                         </Button>
                         <Button
-                            onClick={handleCreateOrder}
-                            isDisable={isSubmitting}
-                            className="h-12 px-7 bg-white hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-500 rounded-lg font-medium text-lg text-slate-900 hover:text-blue-600 shadow-sm transition-all duration-200 flex items-center gap-2"
+                            onClick={paymentMethod === 'momo' ? handleMoMoPayment : handleCreateOrder}
+                            isDisable={isSubmitting || isCreatingMomo}
+                            className={`h-12 px-7 ${paymentMethod === 'momo'
+                                ? 'bg-pink-600 hover:bg-pink-700 text-black hover:text-white-600 border-2 border-slate-200 hover:border-blue-500 text-slate-900 '
+                                : 'bg-white hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-500 text-slate-900 hover:text-blue-600'
+                                } rounded-lg font-medium text-lg shadow-sm transition-all duration-200 flex items-center gap-2`}
                         >
-                            <Image
-                                src="/icons/check.svg"
-                                alt="check"
-                                width={22}
-                                height={22}
-                                className="text-slate-900"
-                                priority
-                            />
-                            {isSubmitting ? 'Đang xử lý...' : 'Tạo đơn hàng'}
+                            {paymentMethod === 'momo' ? (
+                                <>
+                                    <Image
+                                        src="/images/momo-logo.png"
+                                        alt="momo"
+                                        width={22}
+                                        height={22}
+                                        className="text-black"
+                                        priority
+                                    />
+                                    {isCreatingMomo ? 'Đang tạo...' : 'Thanh toán với MoMo'}
+                                    {momoPaymentUrl && (
+                                        <div className="mt-2">
+                                            <a href={momoPaymentUrl} target="_blank" rel="noopener noreferrer" className="text-pink-600 underline">
+                                                Mở lại trang thanh toán MoMo
+                                            </a>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <Image
+                                        src="/icons/check.svg"
+                                        alt="check"
+                                        width={22}
+                                        height={22}
+                                        className="text-slate-900"
+                                        priority
+                                    />
+                                    {isSubmitting ? 'Đang xử lý...' : 'Tạo đơn hàng'}
+                                </>
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -1412,20 +1426,7 @@ export default function CreateOrder() {
                             </div>
                         </div>
                     </div>
-                    <div className="text-center mt-2">
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                            <Image
-                                src="/images/momo-logo.png"
-                                alt="MoMo"
-                                width={24}
-                                height={24}
-                                className="object-contain"
-                            />
-                            <p className="text-lg text-pink-700 font-medium">Võ Minh Anh</p>
-                        </div>
-                        <p className="text-xs text-pink-600">SĐT: <span className="font-medium">*******470</span></p>
-                        <p className="text-xs text-pink-600 mt-1">Nội dung: <span className="font-medium">Thanh toan don hang</span></p>
-                    </div>
+
                 </div>
             )}
 

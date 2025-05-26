@@ -75,12 +75,8 @@ export default function OrderDetail({ params }: { params: Promise<{ id: string }
                     const employeeResponse = await fetch(`/api/user/account/${data.employee_id}?t=${Date.now()}`);
                     if (employeeResponse.ok) {
                         const employeeData = await employeeResponse.json();
-                        const fullName = [
-                            employeeData.name?.first || '',
-                            employeeData.name?.middle || '',
-                            employeeData.name?.last || ''
-                        ].filter(Boolean).join(' ');
-                        setEmployeeName(fullName || 'Chưa xác định');
+                        const fullName = employeeData.name || 'Chưa xác định';
+                        setEmployeeName(fullName);
                     }
                 } catch (err) {
                     console.error('Error fetching employee:', err);
