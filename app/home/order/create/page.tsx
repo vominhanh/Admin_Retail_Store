@@ -4,9 +4,9 @@
 
 import { Button } from '@/components';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { IProduct } from '@/interfaces/product.interface';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { formatCurrency } from '@/utils/format';
 import { IProductDetail } from '@/interfaces/product-detail.interface';
 import { generatePDF } from '@/utils/generatePDF';
@@ -30,6 +30,7 @@ interface OrderItem {
 
 export default function CreateOrder() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { createNotification, notificationElements } = useNotificationsHook();
     const [products, setProducts] = useState<IProduct[]>([]);
     const [, setLoading] = useState(true);
@@ -64,6 +65,156 @@ export default function CreateOrder() {
     const [momoPaymentUrl, setMomoPaymentUrl] = useState<string>('');
     const [isCreatingMomo, setIsCreatingMomo] = useState(false);
 
+    // Hàm cập nhật số lượng sản phẩm đang bán và tổng kho
+    const handleUpdateProductQuantities = async () => {
+        try {
+            if (!orderItems || orderItems.length === 0) {
+                return;
+            }
+
+            // Lấy tất cả thông tin chi tiết sản phẩm hiện tại
+            const response = await fetch(`/api/product-detail?t=${Date.now()}`);
+            if (!response.ok) {
+                throw new Error('Không thể lấy thông tin chi tiết sản phẩm');
+            }
+
+            const productDetails: IProductDetail[] = await response.json();
+
+            // Tạo bản đồ chi tiết sản phẩm theo product_id
+            const productDetailsMap: Record<string, IProductDetail[]> = {};
+
+            productDetails.forEach(detail => {
+                if (!productDetailsMap[detail.product_id]) {
+                    productDetailsMap[detail.product_id] = [];
+                }
+                productDetailsMap[detail.product_id].push(detail);
+            });
+
+            // Cập nhật số lượng cho từng sản phẩm trong đơn hàng
+            for (const orderItem of orderItems) {
+                const productId = orderItem.product._id;
+                const quantityToDecrease = orderItem.quantity;
+                const productName = orderItem.product?.name || `Sản phẩm #${productId}`;
+                const batchDetailId = orderItem.batchDetails?.detailId;
+
+                if (productDetailsMap[productId] && productDetailsMap[productId].length > 0) {
+                    const details = productDetailsMap[productId];
+                    let remainingQuantity = quantityToDecrease;
+
+                    // Nếu có thông tin lô cụ thể, ưu tiên cập nhật lô đó trước
+                    if (batchDetailId) {
+                        const selectedBatch = details.find(d => d._id.toString() === batchDetailId);
+                        if (selectedBatch) {
+                            const currentInput = selectedBatch.input_quantity || 0;
+                            const currentOutput = selectedBatch.output_quantity || 0;
+                            const currentInventory = currentInput - currentOutput;
+
+                            // Số lượng có thể bán từ lô này
+                            const decreaseAmount = Math.min(remainingQuantity, currentInventory);
+
+                            if (decreaseAmount > 0) {
+                                // Tăng output_quantity (số lượng đã bán)
+                                const newOutput = currentOutput + decreaseAmount;
+
+                                try {
+                                    const detailId = selectedBatch._id.toString();
+
+                                    const updateResponse = await fetch(`/api/product-detail/${detailId}?t=${Date.now()}`, {
+                                        method: 'PATCH',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                            output_quantity: newOutput,
+                                            user_id: employee,
+                                            user_name: employeeName,
+                                        }),
+                                    });
+
+                                    if (!updateResponse.ok) {
+                                        const errorText = await updateResponse.text();
+                                        throw new Error(`Không thể cập nhật chi tiết sản phẩm: ${updateResponse.status} ${updateResponse.statusText}`);
+                                    }
+
+                                    // Giảm số lượng còn phải xử lý
+                                    remainingQuantity -= decreaseAmount;
+
+                                } catch (updateError) {
+                                    throw updateError;
+                                }
+                            }
+                        }
+                    }
+
+                    // Nếu vẫn còn số lượng cần trừ, xử lý các lô khác
+                    if (remainingQuantity > 0) {
+                        // Sắp xếp lô theo ngày sản xuất để lấy lô cũ nhất trước
+                        const sortedDetails = details.sort((a, b) => {
+                            const dateA = a.date_of_manufacture ? new Date(a.date_of_manufacture).getTime() : 0;
+                            const dateB = b.date_of_manufacture ? new Date(b.date_of_manufacture).getTime() : 0;
+                            return dateA - dateB;
+                        });
+
+                        // Tiến hành xử lý từng chi tiết sản phẩm
+                        for (const detail of sortedDetails) {
+                            // Bỏ qua lô đã xử lý ở trên
+                            if (batchDetailId && detail._id.toString() === batchDetailId) continue;
+
+                            if (remainingQuantity <= 0) break;
+
+                            const currentInput = detail.input_quantity || 0;
+                            const currentOutput = detail.output_quantity || 0;
+                            const currentInventory = currentInput - currentOutput;
+
+                            // Số lượng có thể bán từ lô này
+                            const decreaseAmount = Math.min(remainingQuantity, currentInventory);
+
+                            if (decreaseAmount > 0) {
+                                // Tăng output_quantity (số lượng đã bán)
+                                const newOutput = currentOutput + decreaseAmount;
+
+                                try {
+                                    const detailId = detail._id.toString();
+
+                                    const updateResponse = await fetch(`/api/product-detail/${detailId}?t=${Date.now()}`, {
+                                        method: 'PATCH',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                            output_quantity: newOutput,
+                                            user_id: employee,
+                                            user_name: employeeName,
+                                        }),
+                                    });
+
+                                    if (!updateResponse.ok) {
+                                        const errorText = await updateResponse.text();
+                                        console.error(`Lỗi khi cập nhật chi tiết sản phẩm ${detailId}:`, errorText);
+                                        throw new Error(`Không thể cập nhật chi tiết sản phẩm: ${updateResponse.status} ${updateResponse.statusText}`);
+                                    }
+
+                                    // Giảm số lượng còn phải xử lý
+                                    remainingQuantity -= decreaseAmount;
+                                    console.log(`Đã cập nhật số lượng đã bán: ${decreaseAmount}. Còn lại cần xử lý: ${remainingQuantity}`);
+
+                                } catch (updateError) {
+                                    console.error(`Lỗi khi gửi request PATCH:`, updateError);
+                                    throw updateError;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Lỗi khi cập nhật số lượng sản phẩm:', error);
+            // Không hiển thị thông báo lỗi cho người dùng trong trường hợp này
+            // vì đơn hàng đã được thanh toán thành công
+            console.warn("Thanh toán vẫn thành công mặc dù có lỗi khi cập nhật số lượng sản phẩm");
+        }
+    };
+
     const totalAmount = orderItems.reduce((sum, item) => {
         const price = item.product.output_price;
         const quantity = item.quantity;
@@ -86,6 +237,92 @@ export default function CreateOrder() {
     useEffect(() => {
         setCustomerPayment(totalAmount.toLocaleString());
     }, [totalAmount]);
+
+    // Kiểm tra nếu có dữ liệu hóa đơn từ thanh toán MoMo
+    // Hàm xử lý khi thanh toán MoMo thành công
+    const handleMomoPaymentSuccess = useCallback(async () => {
+        // Kiểm tra query param showBill từ callback MoMo
+        const showBill = searchParams.get('showBill');
+
+        // Kiểm tra localStorage có dữ liệu hóa đơn không
+        const storedBillData = localStorage.getItem('show_bill_after_payment');
+
+        if (showBill === 'true' && storedBillData) {
+            try {
+                const parsedBillData = JSON.parse(storedBillData);
+                setBillData(parsedBillData);
+                setShowBillModal(true);
+
+                // Tạo đơn hàng từ dữ liệu MoMo
+                const momoOrderDraft = localStorage.getItem('momo_order_draft');
+                if (momoOrderDraft) {
+                    const draftData = JSON.parse(momoOrderDraft);
+
+                    // Gọi API để tạo đơn hàng
+                    const response = await fetch(`/api/order?t=${Date.now()}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            employee_id: draftData.employee_id,
+                            items: draftData.items.map((item: any) => ({
+                                product_id: item.product_id,
+                                quantity: item.quantity,
+                                price: item.price
+                            })),
+                            total_amount: draftData.total_amount,
+                            payment_method: 'momo',
+                            payment_status: true,
+                            note: draftData.note,
+                            status: 'completed'
+                        }),
+                    });
+
+                    if (response.ok) {
+                        // Cập nhật số lượng sản phẩm
+                        await handleUpdateProductQuantities();
+
+                        // Xóa dữ liệu đơn hàng nháp
+                        localStorage.removeItem('momo_order_draft');
+                    } else {
+                        console.error('Lỗi khi tạo đơn hàng từ MoMo:', await response.text());
+                    }
+                }
+
+                // Xóa dữ liệu sau khi đã hiển thị
+                localStorage.removeItem('show_bill_after_payment');
+
+                // Xóa query param và reset trạng thái
+                const url = new URL(window.location.href);
+                url.searchParams.delete('showBill');
+                window.history.replaceState({}, '', url);
+
+                // Reset form sau khi thanh toán thành công
+                setOrderItems([]);
+                setNote('');
+                setPaymentMethod('cash');
+                setDisplayPaymentText('Thanh toán tiền mặt');
+                setShowMomoQR(false);
+                setMomoPaymentUrl('');
+
+                // Hiển thị thông báo thành công
+                createNotification({
+                    children: 'Thanh toán MoMo thành công! Đơn hàng đã được tạo.',
+                    type: ENotificationType.SUCCESS,
+                    isAutoClose: true,
+                    id: Math.random(),
+                });
+            } catch (error) {
+                console.error('Lỗi khi xử lý dữ liệu hóa đơn:', error);
+            }
+        }
+    }, [searchParams, createNotification, handleUpdateProductQuantities]);
+
+    // Kiểm tra khi component mount hoặc URL thay đổi
+    useEffect(() => {
+        handleMomoPaymentSuccess();
+    }, [handleMomoPaymentSuccess]);
 
     useEffect(() => {
         const fetchEmployee = async () => {
@@ -338,7 +575,7 @@ export default function CreateOrder() {
                 const orderData = await response.json();
 
                 // Cập nhật số lượng sản phẩm đang bán và tổng kho
-                await updateProductQuantities();
+                await handleUpdateProductQuantities();
 
                 // Tạo dữ liệu cho PDF/bill
                 const pdfData = {
@@ -485,158 +722,7 @@ export default function CreateOrder() {
         };
     }, []);
 
-    // Hàm cập nhật số lượng sản phẩm đang bán và tổng kho
-    const updateProductQuantities = async () => {
-        try {
 
-            if (!orderItems || orderItems.length === 0) {
-                return;
-            }
-
-            // Lấy tất cả thông tin chi tiết sản phẩm hiện tại
-            const response = await fetch(`/api/product-detail?t=${Date.now()}`);
-            if (!response.ok) {
-                throw new Error('Không thể lấy thông tin chi tiết sản phẩm');
-            }
-
-            const productDetails: IProductDetail[] = await response.json();
-
-            // Tạo bản đồ chi tiết sản phẩm theo product_id
-            const productDetailsMap: Record<string, IProductDetail[]> = {};
-
-            productDetails.forEach(detail => {
-                if (!productDetailsMap[detail.product_id]) {
-                    productDetailsMap[detail.product_id] = [];
-                }
-                productDetailsMap[detail.product_id].push(detail);
-            });
-
-            // Cập nhật số lượng cho từng sản phẩm trong đơn hàng
-            for (const orderItem of orderItems) {
-                const productId = orderItem.product._id;
-                const quantityToDecrease = orderItem.quantity;
-                const productName = orderItem.product?.name || `Sản phẩm #${productId}`;
-                const batchDetailId = orderItem.batchDetails?.detailId;
-
-                if (productDetailsMap[productId] && productDetailsMap[productId].length > 0) {
-                    const details = productDetailsMap[productId];
-                    let remainingQuantity = quantityToDecrease;
-
-                    // Nếu có thông tin lô cụ thể, ưu tiên cập nhật lô đó trước
-                    if (batchDetailId) {
-                        const selectedBatch = details.find(d => d._id.toString() === batchDetailId);
-                        if (selectedBatch) {
-                            const currentInput = selectedBatch.input_quantity || 0;
-                            const currentOutput = selectedBatch.output_quantity || 0;
-                            const currentInventory = currentInput - currentOutput;
-
-                            // Số lượng có thể bán từ lô này
-                            const decreaseAmount = Math.min(remainingQuantity, currentInventory);
-
-                            if (decreaseAmount > 0) {
-                                // Tăng output_quantity (số lượng đã bán)
-                                const newOutput = currentOutput + decreaseAmount;
-
-                                try {
-                                    const detailId = selectedBatch._id.toString();
-
-                                    const updateResponse = await fetch(`/api/product-detail/${detailId}?t=${Date.now()}`, {
-                                        method: 'PATCH',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            output_quantity: newOutput,
-                                            user_id: employee,
-                                            user_name: employeeName,
-                                        }),
-                                    });
-
-                                    if (!updateResponse.ok) {
-                                        const errorText = await updateResponse.text();
-                                        throw new Error(`Không thể cập nhật chi tiết sản phẩm: ${updateResponse.status} ${updateResponse.statusText}`);
-                                    }
-
-                                    // Giảm số lượng còn phải xử lý
-                                    remainingQuantity -= decreaseAmount;
-
-                                } catch (updateError) {
-                                    throw updateError;
-                                }
-                            }
-                        }
-                    }
-
-                    // Nếu vẫn còn số lượng cần trừ, xử lý các lô khác
-                    if (remainingQuantity > 0) {
-                        // Sắp xếp lô theo ngày sản xuất để lấy lô cũ nhất trước
-                        const sortedDetails = details.sort((a, b) => {
-                            const dateA = a.date_of_manufacture ? new Date(a.date_of_manufacture).getTime() : 0;
-                            const dateB = b.date_of_manufacture ? new Date(b.date_of_manufacture).getTime() : 0;
-                            return dateA - dateB;
-                        });
-
-                        // Tiến hành xử lý từng chi tiết sản phẩm
-                        for (const detail of sortedDetails) {
-                            // Bỏ qua lô đã xử lý ở trên
-                            if (batchDetailId && detail._id.toString() === batchDetailId) continue;
-
-                            if (remainingQuantity <= 0) break;
-
-                            const currentInput = detail.input_quantity || 0;
-                            const currentOutput = detail.output_quantity || 0;
-                            const currentInventory = currentInput - currentOutput;
-
-                            // Số lượng có thể bán từ lô này
-                            const decreaseAmount = Math.min(remainingQuantity, currentInventory);
-
-                            if (decreaseAmount > 0) {
-                                // Tăng output_quantity (số lượng đã bán)
-                                const newOutput = currentOutput + decreaseAmount;
-
-                                try {
-                                    const detailId = detail._id.toString();
-
-                                    const updateResponse = await fetch(`/api/product-detail/${detailId}?t=${Date.now()}`, {
-                                        method: 'PATCH',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            output_quantity: newOutput,
-                                            user_id: employee,
-                                            user_name: employeeName,
-                                        }),
-                                    });
-
-                                    if (!updateResponse.ok) {
-                                        const errorText = await updateResponse.text();
-                                        console.error(`Lỗi khi cập nhật chi tiết sản phẩm ${detailId}:`, errorText);
-                                        throw new Error(`Không thể cập nhật chi tiết sản phẩm: ${updateResponse.status} ${updateResponse.statusText}`);
-                                    }
-
-                                    // Giảm số lượng còn phải xử lý
-                                    remainingQuantity -= decreaseAmount;
-                                    console.log(`Đã cập nhật số lượng đã bán: ${decreaseAmount}. Còn lại cần xử lý: ${remainingQuantity}`);
-
-                                } catch (updateError) {
-                                    console.error(`Lỗi khi gửi request PATCH:`, updateError);
-                                    throw updateError;
-                                }
-                            }
-                        }
-                    }
-
-                }
-            }
-
-        } catch (error) {
-            console.error('Lỗi khi cập nhật số lượng sản phẩm:', error);
-            // Không hiển thị thông báo lỗi cho người dùng trong trường hợp này
-            // vì đơn hàng đã được thanh toán thành công
-            console.warn("Thanh toán vẫn thành công mặc dù có lỗi khi cập nhật số lượng sản phẩm");
-        }
-    };
 
     useEffect(() => {
         let beforeDiscount = 0;
@@ -704,6 +790,16 @@ export default function CreateOrder() {
     }, [isDropdownVisible]);
 
     const handleMoMoPayment = async () => {
+        if (orderItems.length === 0) {
+            createNotification({
+                children: 'Vui lòng thêm sản phẩm vào đơn hàng',
+                type: ENotificationType.ERROR,
+                isAutoClose: true,
+                id: Math.random(),
+            });
+            return;
+        }
+
         setIsCreatingMomo(true);
         try {
             // Tạo mã đơn hàng có ý nghĩa
@@ -712,8 +808,8 @@ export default function CreateOrder() {
             const timeStr = today.getTime().toString().slice(-6);
             const orderCode = `MOMO-${dateStr}-${timeStr}`;
 
-            // Lưu thông tin đơn hàng tạm vào localStorage
-            const orderDraft = {
+            // Chuẩn bị dữ liệu đơn hàng
+            const orderData = {
                 employee_id: employee,
                 items: orderItems.map(item => ({
                     product_id: item.product._id,
@@ -737,7 +833,22 @@ export default function CreateOrder() {
                 created_at: new Date(),
                 employee_name: employeeName
             };
-            localStorage.setItem('momo_order_draft', JSON.stringify(orderDraft));
+
+            // Lưu thông tin đơn hàng tạm vào localStorage
+            localStorage.setItem('momo_order_draft', JSON.stringify(orderData));
+
+            // Mã hóa dữ liệu đơn hàng thành base64 để truyền qua extraData
+            const extraData = Buffer.from(JSON.stringify({
+                employee_id: employee,
+                items: orderItems.map(item => ({
+                    product_id: item.product._id,
+                    quantity: item.quantity,
+                    price: item.product.output_price,
+                    batch_detail: item.batchDetails ? {
+                        detail_id: item.batchDetails.detailId
+                    } : null
+                }))
+            })).toString('base64');
 
             const response = await fetch('/api/payment/momo', {
                 method: 'POST',
@@ -745,26 +856,75 @@ export default function CreateOrder() {
                 body: JSON.stringify({
                     orderId: orderCode,
                     amount: totalAmount,
-                    orderInfo: `Thanh toan don hang ${orderCode}`
+                    orderInfo: `Thanh toan don hang ${orderCode}`,
+                    extraData: extraData
                 }),
             });
 
             if (!response.ok) {
-                throw new Error('Không thể tạo thanh toán MoMo');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Không thể tạo thanh toán MoMo');
             }
 
             const data = await response.json();
             if (data.payUrl) {
                 setMomoPaymentUrl(data.payUrl);
+                setShowMomoQR(true);
                 window.open(data.payUrl, '_blank');
+
+                // Lưu thông tin đơn hàng vào localStorage để hiển thị sau khi thanh toán thành công
+                const billData = {
+                    orderCode: orderCode,
+                    employeeName: employeeName,
+                    items: orderItems.map(item => ({
+                        product: {
+                            name: item.product.name,
+                            output_price: item.product.output_price
+                        },
+                        quantity: item.quantity,
+                        batchDetails: item.batchDetails
+                    })),
+                    totalAmount: totalAmount,
+                    customerPayment: totalAmount,
+                    changeAmount: 0,
+                    note: note,
+                    paymentMethod: 'momo',
+                    paymentTime: new Date()
+                };
+                localStorage.setItem('show_bill_after_payment', JSON.stringify(billData));
+
+                createNotification({
+                    children: 'Đã tạo thanh toán MoMo thành công! Vui lòng hoàn tất thanh toán.',
+                    type: ENotificationType.INFO,
+                    isAutoClose: true,
+                    id: Math.random(),
+                });
             } else {
                 throw new Error(data.message || 'Không thể tạo thanh toán MoMo');
             }
         } catch (err) {
             console.error('Lỗi thanh toán MoMo:', err);
-            alert(err instanceof Error ? err.message : 'Có lỗi khi tạo thanh toán MoMo');
+            createNotification({
+                children: err instanceof Error ? err.message : 'Có lỗi khi tạo thanh toán MoMo',
+                type: ENotificationType.ERROR,
+                isAutoClose: true,
+                id: Math.random(),
+            });
         } finally {
             setIsCreatingMomo(false);
+        }
+    };
+
+    // Hàm đóng modal hóa đơn
+    const closeBillModal = () => {
+        setShowBillModal(false);
+        setBillData(null);
+    };
+
+    // Hàm in hóa đơn
+    const printBill = () => {
+        if (billData) {
+            generatePDF(billData);
         }
     };
 
@@ -1274,10 +1434,7 @@ export default function CreateOrder() {
                     <div className="bg-white rounded-xl p-10 w-[480px] max-h-[95vh] overflow-y-auto relative print:w-full print:max-w-full print:rounded-none print:p-2 border font-sans text-lg">
                         <button
                             className="absolute top-4 right-4 text-2xl print:hidden"
-                            onClick={() => {
-                                setShowBillModal(false);
-                                setOrderItems([]);
-                            }}
+                            onClick={closeBillModal}
                         >×</button>
                         <div className="text-center mb-3">
                             <div className="font-bold text-lg">CỬA HÀNG BÁN LẺ</div>
@@ -1286,9 +1443,12 @@ export default function CreateOrder() {
                             <div className="text-lg mb-1">Phường 17, Quận Gò Vấp, TP HCM</div>
                         </div>
                         <div className="text-center font-bold text-2xl my-3">PHIẾU THANH TOÁN</div>
-                        <div className="mb-1 text-lg">SỐ CT: <span className="font-mono">{billData.orderId}</span></div>
-                        <div className="mb-1 text-lg">Ngày CT: {new Date().toLocaleDateString('vi-VN')} {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="mb-1 text-lg">SỐ CT: <span className="font-mono">{billData.orderCode}</span></div>
+                        <div className="mb-1 text-lg">Ngày CT: {new Date(billData.paymentTime || new Date()).toLocaleDateString('vi-VN')} {new Date(billData.paymentTime || new Date()).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
                         <div className="mb-1 text-lg">Nhân viên: {billData.employeeName}</div>
+                        {billData.momoTransId && (
+                            <div className="mb-1 text-lg">Mã giao dịch MoMo: <span className="font-mono">{billData.momoTransId}</span></div>
+                        )}
                         <div className="border-t border-dashed border-black my-3"></div>
                         <table className="w-full text-lg mb-3">
                             <thead>
@@ -1341,9 +1501,9 @@ export default function CreateOrder() {
                         <div className="border-t border-dashed border-black my-3"></div>
                         <div className="flex flex-col gap-1 text-lg">
                             <div className="flex justify-between"><span className="font-bold">Thành tiền:</span><span className="font-bold">{formatCurrency(billData.totalAmount)} </span></div>
-                            <div className="flex justify-between"><span className="font-bold">Thanh toán:</span><span className="font-bold">{formatCurrency(billData.totalAmount)} </span></div>
-                            <div className="flex justify-between"><span className="font-bold">Tiền khách đưa:</span><span className="font-bold">{billData.customerPayment} đ</span></div>
-                            <div className="flex justify-between"><span className="font-bold">Tiền thối lại:</span><span className="font-bold">{billData.changeAmount} đ</span></div>
+                            <div className="flex justify-between"><span className="font-bold">Thanh toán:</span><span className="font-bold">{billData.paymentMethod === 'momo' ? 'Ví MoMo' : 'Tiền mặt'} </span></div>
+                            <div className="flex justify-between"><span className="font-bold">Tiền khách đưa:</span><span className="font-bold">{formatCurrency(billData.customerPayment)} </span></div>
+                            <div className="flex justify-between"><span className="font-bold">Tiền thối lại:</span><span className="font-bold">{formatCurrency(billData.changeAmount || 0)} </span></div>
                         </div>
                         <div className="border-t border-dashed border-black my-3"></div>
                         <div className="text-lg text-center mt-2">
@@ -1353,7 +1513,7 @@ export default function CreateOrder() {
                         </div>
                         <div className="flex justify-center mt-6 print:hidden">
                             <Button
-                                onClick={() => generatePDF(billData)}
+                                onClick={printBill}
                                 className="bg-blue-700 border border-blue-700 text-yellow-300 px-8 py-3 rounded-lg text-lg font-bold uppercase tracking-wider hover:bg-blue-800 hover:border-blue-800"
                             >
                                 In hóa đơn

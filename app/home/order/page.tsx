@@ -6,10 +6,11 @@
 import { Button } from '@/components'
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { formatCurrency } from '@/utils/format';
 import PaymentModal from '@/components/PaymentModal';
 import { IProductDetail } from '@/interfaces/product-detail.interface';
+import { generatePDF } from '@/utils/generatePDF';
 
 interface OrderItem {
   product_id: string;
@@ -41,10 +42,13 @@ const ImportOrderList = () => {
   const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending'>('pending');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [selectedOrderAmount, setSelectedOrderAmount] = useState<number>(0);
   const [selectedOrderItems, setSelectedOrderItems] = useState<any[]>([]);
+  const [showBillModal, setShowBillModal] = useState(false);
+  const [billData, setBillData] = useState<any>(null);
 
   const fetchOrders = async (status: 'all' | 'completed' | 'pending' = statusFilter) => {
     setLoading(true);
@@ -64,9 +68,34 @@ const ImportOrderList = () => {
     setLoading(false);
   };
 
+  // Kiểm tra nếu có dữ liệu hóa đơn từ thanh toán MoMo
   useEffect(() => {
+    // Kiểm tra query param showBill từ callback MoMo
+    const showBill = searchParams.get('showBill');
+
+    // Kiểm tra localStorage có dữ liệu hóa đơn không
+    const storedBillData = localStorage.getItem('show_bill_after_payment');
+
+    if (showBill === 'true' && storedBillData) {
+      try {
+        const parsedBillData = JSON.parse(storedBillData);
+        setBillData(parsedBillData);
+        setShowBillModal(true);
+
+        // Xóa dữ liệu sau khi đã hiển thị
+        localStorage.removeItem('show_bill_after_payment');
+
+        // Xóa query param
+        const url = new URL(window.location.href);
+        url.searchParams.delete('showBill');
+        window.history.replaceState({}, '', url);
+      } catch (error) {
+        console.error('Lỗi khi xử lý dữ liệu hóa đơn:', error);
+      }
+    }
+
     fetchOrders(statusFilter);
-  }, [statusFilter]);
+  }, [statusFilter, searchParams]);
 
   const handleCreateOrder = () => {
     router.push('/home/order/create');
@@ -238,6 +267,17 @@ const ImportOrderList = () => {
     fetchOrders(statusFilter);
     setIsModalOpen(false);
     alert('Thanh toán thành công!');
+  };
+
+  const closeBillModal = () => {
+    setShowBillModal(false);
+    setBillData(null);
+  };
+
+  const printBill = () => {
+    if (billData) {
+      generatePDF(billData);
+    }
   };
 
   return (
@@ -675,6 +715,98 @@ const ImportOrderList = () => {
           totalAmount={selectedOrderAmount}
           orderItems={selectedOrderItems}
         />
+
+        {/* Bill Modal */}
+        {showBillModal && billData && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-10 w-[480px] max-h-[95vh] overflow-y-auto relative print:w-full print:max-w-full print:rounded-none print:p-2 border font-sans text-lg">
+              <button
+                className="absolute top-4 right-4 text-2xl print:hidden"
+                onClick={closeBillModal}
+              >×</button>
+              <div className="text-center mb-3">
+                <div className="font-bold text-lg">CỬA HÀNG BÁN LẺ</div>
+                <div className="text-lg">www.cuahangbanle.com</div>
+                <div className="text-lg">32/37 Đường Lê Thị Hồng,</div>
+                <div className="text-lg mb-1">Phường 17, Quận Gò Vấp, TP HCM</div>
+              </div>
+              <div className="text-center font-bold text-2xl my-3">PHIẾU THANH TOÁN</div>
+              <div className="mb-1 text-lg">SỐ CT: <span className="font-mono">{billData.orderCode}</span></div>
+              <div className="mb-1 text-lg">Ngày CT: {new Date(billData.paymentTime || new Date()).toLocaleDateString('vi-VN')} {new Date(billData.paymentTime || new Date()).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
+              <div className="mb-1 text-lg">Nhân viên: {billData.employeeName}</div>
+              <div className="border-t border-dashed border-black my-3"></div>
+              <table className="w-full text-lg mb-3">
+                <thead>
+                  <tr className="border-b border-dashed border-black">
+                    <th className="text-left font-bold">Sản phẩm</th>
+                    <th className="font-bold">SL</th>
+                    <th className="font-bold">Giá</th>
+                    <th className="font-bold">Giảm giá</th>
+                    <th className="text-right font-bold">T.Tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {billData.items.map((item: any, idx: number) => {
+                    let isDiscount = false;
+                    let discountText = '0';
+                    let price = item.product.output_price;
+                    let total = price * item.quantity;
+                    if (item.batchDetails && item.batchDetails.expiryDate) {
+                      const now = new Date();
+                      const expiry = new Date(item.batchDetails.expiryDate);
+                      const diffDays = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                      if (diffDays <= 30) {
+                        isDiscount = true;
+                        discountText = '50%';
+                        price = price * 0.5;
+                        total = price * item.quantity;
+                      }
+                    }
+                    return (
+                      <tr key={idx}>
+                        <td className="align-top">{item.product.name}</td>
+                        <td className="align-top text-center">{item.quantity}</td>
+                        <td className="align-top text-right">
+                          {isDiscount ? (
+                            <>
+                              <span className="line-through text-gray-400 mr-1">{formatCurrency(item.product.output_price)}</span>
+                              <span className="text-red-600 font-bold">{formatCurrency(price)}</span>
+                            </>
+                          ) : (
+                            <span>{formatCurrency(item.product.output_price)}</span>
+                          )}
+                        </td>
+                        <td className="align-top text-center">{discountText}</td>
+                        <td className="align-top text-right">{formatCurrency(total)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className="border-t border-dashed border-black my-3"></div>
+              <div className="flex flex-col gap-1 text-lg">
+                <div className="flex justify-between"><span className="font-bold">Thành tiền:</span><span className="font-bold">{formatCurrency(billData.totalAmount)} </span></div>
+                <div className="flex justify-between"><span className="font-bold">Thanh toán:</span><span className="font-bold">{billData.paymentMethod === 'momo' ? 'Ví MoMo' : 'Tiền mặt'} </span></div>
+                <div className="flex justify-between"><span className="font-bold">Tiền khách đưa:</span><span className="font-bold">{formatCurrency(billData.customerPayment)} </span></div>
+                <div className="flex justify-between"><span className="font-bold">Tiền thối lại:</span><span className="font-bold">{formatCurrency(billData.changeAmount || 0)} </span></div>
+              </div>
+              <div className="border-t border-dashed border-black my-3"></div>
+              <div className="text-lg text-center mt-2">
+                (Giá trên đã bao gồm thuế GTGT)<br />
+                Lưu ý: Cửa hàng chỉ xuất hóa đơn trong ngày.<br />
+                Quý khách vui lòng liên hệ thu ngân để được hỗ trợ.
+              </div>
+              <div className="flex justify-center mt-6 print:hidden">
+                <Button
+                  onClick={printBill}
+                  className="bg-blue-700 border border-blue-700 text-yellow-300 px-8 py-3 rounded-lg text-lg font-bold uppercase tracking-wider hover:bg-blue-800 hover:border-blue-800"
+                >
+                  In hóa đơn
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
