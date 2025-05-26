@@ -21,6 +21,7 @@
     "jose": "^6.0.10",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.511.0",
     "mongoose": "^8.12.1",
     "multer-storage-cloudinary": "^4.0.0",
     "next": "^15.2.2",
