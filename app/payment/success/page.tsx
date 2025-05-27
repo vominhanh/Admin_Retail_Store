@@ -94,6 +94,27 @@ export default function PaymentSuccess() {
                         }
 
                         const data = await response.json();
+
+                        // Tạo lịch sử kho cho từng sản phẩm trong đơn hàng
+                        if (data.order && data.order.items) {
+                            for (const item of data.order.items) {
+                                await fetch('/api/stock-history/create', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        product_id: item.product_id,
+                                        action: 'export',
+                                        quantity: item.quantity,
+                                        related_receipt_id: data.order._id,
+                                        note: `Xuất hàng cho đơn hàng ${orderId}`,
+                                        user_name: employeeName
+                                    }),
+                                });
+                            }
+                        }
+
                         setPaymentInfo({
                             resultCode,
                             orderId,

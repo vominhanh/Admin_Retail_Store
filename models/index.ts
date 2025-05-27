@@ -3,7 +3,9 @@ import { ProductModel } from "@/models/Product";
 import { RoleModel } from "@/models/Role";
 
 export {
-  AccountModel, 
-  ProductModel, 
-  RoleModel, 
+  AccountModel,
+  ProductModel,
+  RoleModel,
 }
+
+export * from './Customer';

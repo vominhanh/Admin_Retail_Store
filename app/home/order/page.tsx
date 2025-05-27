@@ -39,7 +39,11 @@ const ImportOrderList = () => {
   const [sortField, setSortField] = useState<'date' | 'price'>('date');
   const [dateFilter, setDateFilter] = useState<'range'>('range');
   const [fromDate, setFromDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [toDate, setToDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [toDate, setToDate] = useState<string>(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  });
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending'>('pending');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -352,7 +356,16 @@ const ImportOrderList = () => {
                   <input
                     type="date"
                     value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
+                    onChange={(e) => {
+                      const newFromDate = e.target.value;
+                      setFromDate(newFromDate);
+                      // Nếu toDate <= fromDate thì cập nhật toDate = fromDate + 1 ngày
+                      if (newFromDate >= toDate) {
+                        const nextDay = new Date(newFromDate);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        setToDate(nextDay.toISOString().split('T')[0]);
+                      }
+                    }}
                     className="flex-1 border-0 bg-transparent focus:outline-none focus:ring-0 text-blue-600 font-medium"
                   />
                 </div>
@@ -374,7 +387,20 @@ const ImportOrderList = () => {
                   <input
                     type="date"
                     value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
+                    min={(() => {
+                      const minDate = new Date(fromDate);
+                      minDate.setDate(minDate.getDate() + 1);
+                      return minDate.toISOString().split('T')[0];
+                    })()}
+                    onChange={(e) => {
+                      const newToDate = e.target.value;
+                      // Chỉ cho phép chọn ngày lớn hơn fromDate
+                      if (newToDate > fromDate) {
+                        setToDate(newToDate);
+                      } else {
+                        alert('Ngày kết thúc phải lớn hơn ngày bắt đầu ít nhất 1 ngày!');
+                      }
+                    }}
                     className="flex-1 border-0 bg-transparent focus:outline-none focus:ring-0 text-blue-600 font-medium"
                   />
                 </div>

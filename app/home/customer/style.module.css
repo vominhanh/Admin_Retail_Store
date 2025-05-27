@@ -1,0 +1,106 @@
+.container {
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #333;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+}
+
+.searchInput {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 300px;
+    font-size: 14px;
+}
+
+.addButton {
+    padding: 8px 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.addButton:hover {
+    background-color: #45a049;
+}
+
+.tableContainer {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.table th,
+.table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.table th {
+    background-color: #f5f5f5;
+    font-weight: 600;
+}
+
+.table tr:hover {
+    background-color: #f9f9f9;
+}
+
+.editButton,
+.deleteButton {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 8px;
+    font-size: 14px;
+}
+
+.editButton {
+    background-color: #2196F3;
+    color: white;
+}
+
+.editButton:hover {
+    background-color: #1976D2;
+}
+
+.deleteButton {
+    background-color: #f44336;
+    color: white;
+}
+
+.deleteButton:hover {
+    background-color: #d32f2f;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}

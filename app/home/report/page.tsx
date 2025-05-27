@@ -21,9 +21,20 @@ function formatCurrency(n: number) {
 // Hàm lấy ngày hôm nay dạng yyyy-mm-dd
 function getToday() {
     const today = new Date();
+    today.setDate(today.getDate() - 1);
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+// Hàm lấy ngày hôm sau dạng yyyy-mm-dd
+function getNextDay(dateStr: string) {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + 1);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -53,8 +64,8 @@ export default function ReportPage() {
         totalOrders: 0,
         periodLabel: ''
     });
-    const [fromDate, setFromDate] = useState('');
-    const [toDate, setToDate] = useState('');
+    const [fromDate, setFromDate] = useState(getToday());
+    const [toDate, setToDate] = useState(getNextDay(getToday()));
     const [shouldFetch, setShouldFetch] = useState(false);
 
     // Lấy danh sách sản phẩm và danh mục
@@ -97,7 +108,24 @@ export default function ReportPage() {
         setProductId('');
         setCategoryId('');
         setTopProducts([]);
+        if (newType === 'product' || newType === 'category') {
+            setFromDate(getToday());
+            setToDate(getNextDay(getToday()));
+        } else {
+            setFromDate('');
+            setToDate('');
+        }
     };
+
+    // Tự động cập nhật 'Đến ngày' khi chọn 'Từ ngày' là ngày hiện tại
+    useEffect(() => {
+        if ((type === 'product' || type === 'category') && fromDate) {
+            const today = getToday();
+            if (fromDate === today && !toDate) {
+                setToDate(getNextDay(fromDate));
+            }
+        }
+    }, [fromDate, type]);
 
     // Tải dữ liệu báo cáo
     useEffect(() => {

@@ -118,6 +118,11 @@ export default function RootLayout({
           icon: plusIcon,
         },
         {
+          link: `${currentPath}/shipping`,
+          label: `Quản lý vận chuyển`,
+          icon: truckIcon,
+        },
+        {
           link: `${currentPath}/return-exchange`,
           label: `Đổi đơn hàng`,
           icon: listRestartIcon,
@@ -206,6 +211,11 @@ export default function RootLayout({
             link: `${currentPath}/product`,
             label: `Sản phẩm`,
             icon: boxIcon,
+          },
+          {
+            link: `${currentPath}/customer`,
+            label: `Khách hàng`,
+            icon: userIcon,
           },
         ]
       },
