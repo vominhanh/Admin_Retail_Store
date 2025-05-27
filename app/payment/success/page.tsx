@@ -98,7 +98,7 @@ export default function PaymentSuccess() {
                         // Tạo lịch sử kho cho từng sản phẩm trong đơn hàng
                         if (data.order && data.order.items) {
                             for (const item of data.order.items) {
-                                await fetch('/api/stock-history/create', {
+                                await fetch('/api/stock-history', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',

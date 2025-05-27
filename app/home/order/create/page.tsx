@@ -574,12 +574,13 @@ export default function CreateOrder() {
             if (response.ok) {
                 const orderData = await response.json();
 
-                // Cập nhật số lượng sản phẩm đang bán và tổng kho
+                // Cập nhật số lượng sản phẩm
                 await handleUpdateProductQuantities();
 
                 // Tạo dữ liệu cho PDF/bill
                 const pdfData = {
                     orderId: orderData._id,
+                    orderCode: orderData.order_code || orderData._id,
                     employeeName: employeeName,
                     items: orderItems.map(item => ({
                         product: {
@@ -590,9 +591,11 @@ export default function CreateOrder() {
                         batchDetails: item.batchDetails
                     })),
                     totalAmount: totalAmount,
-                    customerPayment: customerPayment,
+                    customerPayment: parseInt(customerPayment.replace(/[^\d]/g, '')),
                     changeAmount: changeAmount,
-                    note: note
+                    note: note,
+                    paymentMethod: paymentMethod,
+                    paymentTime: new Date()
                 };
 
                 // Hiển thị modal bill thay vì chuyển trang
@@ -1407,28 +1410,6 @@ export default function CreateOrder() {
                 </div>
             </div>
 
-            {showMomoQR && (
-                <div className="bg-pink-50 border border-pink-200 rounded-lg mt-2 p-3">
-                    <div className="text-center mb-2">
-                        <p className="text-lg font-medium text-pink-700">Quét mã MoMo để thanh toán</p>
-                        <p className="text-xs text-pink-600 mt-1">Số tiền: {formatCurrency(totalAmount)}</p>
-                    </div>
-                    <div className="flex justify-center">
-                        <div className="bg-white p-3 rounded-lg border border-pink-200 shadow-sm">
-                            <div className="w-48 h-48 relative">
-                                <Image
-                                    src="/images/qr_momo.jpg"
-                                    alt="Mã QR MoMo"
-                                    fill
-                                    className="object-contain"
-                                    priority
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            )}
 
             {showBillModal && billData && (
                 <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -1502,8 +1483,8 @@ export default function CreateOrder() {
                         <div className="border-t border-dashed border-black my-3"></div>
                         <div className="flex flex-col gap-1 text-lg">
                             <div className="flex justify-between"><span className="font-bold">Thành tiền:</span><span className="font-bold">{formatCurrency(billData.totalAmount)} </span></div>
-                            <div className="flex justify-between"><span className="font-bold">Thanh toán:</span><span className="font-bold">{billData.paymentMethod === 'momo' ? 'Ví MoMo' : 'Tiền mặt'} </span></div>
-                            <div className="flex justify-between"><span className="font-bold">Tiền khách đưa:</span><span className="font-bold">{formatCurrency(billData.customerPayment)} </span></div>
+                            <div className="flex justify-between"><span className="font-bold">Hình thức thanh toán:</span><span className="font-bold">{billData.paymentMethod === 'momo' ? 'Ví MoMo' : 'Tiền mặt'} </span></div>
+                            <div className="flex justify-between"><span className="font-bold">Tiền khách đưa:</span><span className="font-bold">{formatCurrency(Number(billData.customerPayment) || 0)} </span></div>
                             <div className="flex justify-between"><span className="font-bold">Tiền thối lại:</span><span className="font-bold">{formatCurrency(billData.changeAmount || 0)} </span></div>
                         </div>
                         <div className="border-t border-dashed border-black my-3"></div>
