@@ -143,11 +143,66 @@ function WarehouseReceipt() {
   const [isClickShowMore, setIsClickShowMore] = useState<ICollectionIdNotify>({ id: ``, isClicked: false });
   const [isClickDelete, setIsClickDelete] = useState<ICollectionIdNotify>({ id: ``, isClicked: false });
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [dateFilter, setDateFilter] = useState<string>('0');
+  const [dateFilter, setDateFilter] = useState<string>('1');
+  const [pendingDateFilter, setPendingDateFilter] = useState<string>('1');
+  const [customDate, setCustomDate] = useState<string>('');
   const [filteredReceiptCount, setFilteredReceiptCount] = useState<number>(0);
   const [orderFormOptions, setOrderFormOptions] = useState<ISelectOption[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Fetch receipts theo filter
+  const [warehouseReceipts, setWarehouseReceipts] = useState<IWarehouseReceipt[]>([]);
+  const [isLoadingWarehouseReceipts, setIsLoadingWarehouseReceipts] = useState<boolean>(false);
+
+  const fetchWarehouseReceipts = useCallback(async (date: string, customDateValue?: string) => {
+    setIsLoadingWarehouseReceipts(true);
+    try {
+      let url = '/api/warehouse-receipt';
+      if (date && date !== '0') {
+        url += `?date=${date}`;
+        if (date === 'custom' && customDateValue) {
+          url += `&customDate=${customDateValue}`;
+        }
+      }
+      console.log('Gọi API:', url); // Log URL để debug
+      const response = await fetch(url);
+      const receipts = await response.json();
+      setWarehouseReceipts(receipts);
+    } catch (e) {
+      // handle error
+    } finally {
+      setIsLoadingWarehouseReceipts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setDateFilter('1');
+    setPendingDateFilter('1');
+    fetchWarehouseReceipts('1');
+  }, [fetchWarehouseReceipts]);
+
+  const handleApplyFilter = () => {
+    if (pendingDateFilter === 'custom' && !customDate) {
+      createNotification({
+        id: 0,
+        children: <Text>Vui lòng chọn ngày cụ thể trước khi lọc</Text>,
+        type: ENotificationType.ERROR,
+        isAutoClose: true,
+        title: "Lỗi nhập liệu"
+      });
+      return;
+    }
+
+    setDateFilter(pendingDateFilter);
+    setCurrentPage(1);
+    fetchWarehouseReceipts(pendingDateFilter, customDate);
+  };
+
+  // Cập nhật số lượng phiếu đã lọc sau mỗi lần fetch
+  useEffect(() => {
+    setFilteredReceiptCount(warehouseReceipts.length);
+  }, [warehouseReceipts]);
 
   // Thêm các hàm xử lý sự kiện
   const handleChangeWarehouseReceiptProductQuantity = useCallback((e: ChangeEvent<HTMLInputElement>, index: number): void => {
@@ -264,11 +319,6 @@ function WarehouseReceipt() {
     enabled: businesses.length > 0,
   });
 
-  const { data: warehouseReceipts = [], isLoading: isLoadingWarehouseReceipts } = useQuery({
-    queryKey: ['warehouse-receipts'],
-    queryFn: () => fetchGetCollections<IWarehouseReceipt>(ECollectionNames.WAREHOUSE_RECEIPT),
-  });
-
   // Thêm useEffect để xử lý dữ liệu và cập nhật SelectDropdown
   useEffect(() => {
     if (orderForms.length > 0) {
@@ -357,7 +407,7 @@ function WarehouseReceipt() {
 
   const supplierOptions = React.useMemo(() =>
     businesses
-      .filter(b => b.type === 'SUPPLIER')
+      // .filter(b => b.type === 'SUPPLIER')  // Loại bỏ bộ lọc type vì không tồn tại trong IBusiness
       .map(supplier => ({
         label: supplier.name,
         value: supplier._id
@@ -376,9 +426,10 @@ function WarehouseReceipt() {
     { label: '7 ngày qua', days: 7, value: '7' },
     { label: 'Tháng này', days: 30, value: '30' },
     { label: 'Tháng trước', days: 60, value: '60' },
+    { label: 'Chọn ngày cụ thể', days: -1, value: 'custom' },
   ];
 
-  // Sắp xếp danh sách phiếu nhập kho
+  // Sắp xếp danh sách phiếu nhập kho (không lọc lại trên client)
   const sortedWarehouseReceipts = React.useMemo(() => {
     return [...warehouseReceipts].sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -619,7 +670,15 @@ function WarehouseReceipt() {
 
       let filteredReceipts: IWarehouseReceipt[] = [];
 
-      if (filterDays === 30) {
+      if (dateFilter === 'custom' && customDate) {
+        const selectedDate = new Date(customDate);
+        selectedDate.setHours(0, 0, 0, 0);
+        filteredReceipts = items.filter(receipt => {
+          const receiptDate = new Date(receipt.created_at);
+          receiptDate.setHours(0, 0, 0, 0);
+          return receiptDate.getTime() === selectedDate.getTime();
+        });
+      } else if (filterDays === 30) {
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         filteredReceipts = items.filter(receipt => {
           const receiptDate = new Date(receipt.created_at);
@@ -648,41 +707,77 @@ function WarehouseReceipt() {
       setFilteredReceiptCount(items.length);
       return items;
     }
-  }, [dateFilter]);
+  }, [dateFilter, customDate]);
 
+  // Render bộ lọc
   const renderDateFilters = useCallback((): ReactElement => {
     return (
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Text className="text-gray-700 font-medium">Lọc theo thời gian:</Text>
+      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 mb-5">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Text className="text-gray-700 font-medium whitespace-nowrap">Lọc theo thời gian:</Text>
             {filteredReceiptCount > 0 && (
-              <div className="bg-blue-100 text-blue-800 text-xs font-medium rounded-full px-2.5 py-1">
+              <div className="bg-blue-100 text-blue-800 text-xs font-medium rounded-full px-2.5 py-1 ml-2">
                 {filteredReceiptCount} phiếu
               </div>
             )}
           </div>
-          <div className="w-60">
-            <SelectDropdown
-              className="bg-white border-blue-200 hover:border-blue-400"
-              options={dateFilters.map(filter => ({
-                label: filter.label,
-                value: filter.value
-              }))}
-              defaultOptionIndex={getSelectedOptionIndex(
-                dateFilters.map(filter => ({
+
+          <div className="flex items-center flex-wrap">
+            <div className="w-64">
+              <SelectDropdown
+                className="bg-white border border-gray-200 hover:border-blue-400 shadow-sm transition-all w-full"
+                options={dateFilters.map(filter => ({
                   label: filter.label,
                   value: filter.value
-                })),
-                dateFilter
+                }))}
+                defaultOptionIndex={getSelectedOptionIndex(
+                  dateFilters.map(filter => ({
+                    label: filter.label,
+                    value: filter.value
+                  })),
+                  pendingDateFilter
+                )}
+                onInputChange={e => setPendingDateFilter(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 ml-3">
+              {pendingDateFilter === 'custom' ? (
+                <div className="flex items-center">
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={customDate}
+                      onChange={e => setCustomDate(e.target.value)}
+                      className="border border-gray-200 rounded-md px-3 py-2 min-w-[200px] text-lg shadow-sm focus:border-blue-400 focus:outline-none transition-all"
+                      required
+                      placeholder="dd/mm/yyyy"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleApplyFilter}
+                    type={EButtonType.INFO}
+                    className="ml-3 px-5 py-2 font-medium shadow-md hover:shadow-lg transition-all"
+                  >
+                    Lọc
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleApplyFilter}
+                  type={EButtonType.INFO}
+                  className="px-5 py-2 font-medium shadow-md hover:shadow-lg transition-all"
+                >
+                  Lọc
+                </Button>
               )}
-              onInputChange={(e): void => setDateFilter(e.target.value)}
-            />
+            </div>
           </div>
         </div>
       </div>
     );
-  }, [dateFilter, filteredReceiptCount]);
+  }, [pendingDateFilter, filteredReceiptCount, customDate, handleApplyFilter]);
 
   const renderContent = useCallback((): ReactElement => {
     return (
@@ -1153,10 +1248,11 @@ function WarehouseReceipt() {
       isClickShowMore={isClickShowMore}
       isClickDelete={isClickDelete}
       handleOpenModal={handleOpenModal}
-      additionalProcessing={additionalProcessing}
       renderFilters={renderDateFilters}
       currentPage={currentPage}
       setCurrentPage={setCurrentPage}
+      displayedItems={sortedWarehouseReceipts}
+      isLoaded={isLoadingWarehouseReceipts}
     >
       {renderContent()}
     </ManagerPage>

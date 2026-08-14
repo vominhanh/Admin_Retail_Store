@@ -141,20 +141,18 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .info {
-    background-color: rgba(24, 144, 255, 0.15);
-  }
+:global(:root[data-theme="dark"]) .info {
+  background-color: rgba(24, 144, 255, 0.15);
+}
 
-  .success {
-    background-color: rgba(82, 196, 26, 0.15);
-  }
+:global(:root[data-theme="dark"]) .success {
+  background-color: rgba(82, 196, 26, 0.15);
+}
 
-  .error {
-    background-color: rgba(245, 34, 45, 0.15);
-  }
+:global(:root[data-theme="dark"]) .error {
+  background-color: rgba(245, 34, 45, 0.15);
+}
 
-  .warning {
-    background-color: rgba(250, 173, 20, 0.15);
-  }
+:global(:root[data-theme="dark"]) .warning {
+  background-color: rgba(250, 173, 20, 0.15);
 }

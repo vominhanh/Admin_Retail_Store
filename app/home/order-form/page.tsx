@@ -44,12 +44,22 @@ interface IDateFilter {
   value: string;
 }
 
+// Danh sách các bộ lọc ngày
+const dateFilters: IDateFilter[] = [
+  { label: 'Hôm nay', days: 1, value: '1' },
+  { label: '7 ngày qua', days: 7, value: '7' },
+  { label: 'Tháng này', days: 30, value: '30' },
+  { label: 'Tháng trước', days: 60, value: '60' },
+  { label: 'Chọn ngày cụ thể', days: -1, value: 'custom' },
+];
+
 export default function Product() {
   const { createNotification, notificationElements } = useNotificationsHook();
   const [orderForm, setOrderForm] = useState<collectionType>(
     DEFAULT_ORDER_FORM
   );
   const [isModalReadOnly, setIsModalReadOnly] = useState<boolean>(false);
+  const [isAddCollectionModalOpen, setIsAddCollectionModalOpen] = useState<boolean>(false);
   const [isClickShowMore, setIsClickShowMore] = useState<ICollectionIdNotify>({
     id: ``,
     isClicked: false
@@ -69,22 +79,32 @@ export default function Product() {
   const [unitOptions, setUnitOptions] = useState<ISelectOption[]>([]);
   const [productDetailCount, setProductDetailCount] = useState<number>(-1);
   const [allProducts, setAllProducts] = useState<IProduct[]>([]);
-  const [dateFilter, setDateFilter] = useState<string>('0');
+  const [dateFilter, setDateFilter] = useState<string>('1');
   const [filteredOrderCount, setFilteredOrderCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [allOrders, setAllOrders] = useState<collectionType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const itemsPerPage = 10;
+  const [statusFilter, setStatusFilter] = useState<string>(OrderFormStatus.PENDING);
+  const [pendingStatusFilter, setPendingStatusFilter] = useState<string>(OrderFormStatus.PENDING);
+  const [pendingDateFilter, setPendingDateFilter] = useState<string>('1');
+  const [customDate, setCustomDate] = useState<string>('');
 
-  // Danh sách các bộ lọc ngày
-  const dateFilters: IDateFilter[] = [
-    { label: 'Tất cả', days: 0, value: '0' },
-    { label: 'Hôm nay', days: 1, value: '1' },
-    { label: '7 ngày qua', days: 7, value: '7' },
-    { label: 'Tháng này', days: 30, value: '30' },
-    { label: 'Tháng trước', days: 60, value: '60' },
+  // Danh sách các bộ lọc trạng thái
+  const statusFilters = [
+    { label: 'Chưa hoàn thành', value: OrderFormStatus.PENDING },
+    { label: 'Hoàn thành', value: OrderFormStatus.COMPLETED },
   ];
+
+  // Dùng useMemo cho dateFilter options (bên trong function component)
+  const dateFilterOptions = useMemo(() =>
+    dateFilters.map(filter => ({
+      label: filter.label,
+      value: filter.value
+    })),
+    [dateFilters]
+  );
 
   // Hàm tạo mã đơn đặt hàng
   const generateOrderCode = (id: string): string => {
@@ -563,149 +583,186 @@ export default function Product() {
 
   }, [isModalReadOnly, businessOptions]);
 
-  // Hàm xử lý lọc dữ liệu theo thời gian
-  const filterOrdersByDate = useCallback((orders: collectionType[]): collectionType[] => {
-    // Nếu là lọc tất cả, hoặc không có bộ lọc
-    if (!dateFilter || dateFilter === '0') {
-      setFilteredOrderCount(orders.length);
-      return orders;
+  // Hàm lọc dữ liệu phía client giống warehouse-receipt
+  const filterOrders = useCallback((orders: collectionType[]): collectionType[] => {
+    let filtered = orders;
+    // Lọc theo trạng thái
+    if (statusFilter === OrderFormStatus.PENDING) {
+      filtered = filtered.filter(order => order.status === OrderFormStatus.PENDING);
+    } else if (statusFilter === OrderFormStatus.COMPLETED) {
+      filtered = filtered.filter(order => order.status === OrderFormStatus.COMPLETED);
     }
-
-    try {
-      const filterDays = parseInt(dateFilter);
+    // Lọc theo ngày
+    if (dateFilter && dateFilter !== '0') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-
-      // Xử lý các trường hợp đặc biệt (tháng này, tháng trước)
-      let filteredOrders: collectionType[] = [];
-
-      if (filterDays === 30) { // Tháng này
+      if (dateFilter === '1') {
+        filtered = filtered.filter(order => new Date(order.created_at) >= today);
+      } else if (dateFilter === '7') {
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        filtered = filtered.filter(order => new Date(order.created_at) >= sevenDaysAgo);
+      } else if (dateFilter === '30') {
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        filteredOrders = orders.filter(order => {
-          const orderDate = new Date(order.created_at);
-          return orderDate >= firstDayOfMonth && orderDate <= today;
-        });
-      } else if (filterDays === 60) { // Tháng trước
+        filtered = filtered.filter(order => new Date(order.created_at) >= firstDayOfMonth);
+      } else if (dateFilter === '60') {
         const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-        filteredOrders = orders.filter(order => {
+        filtered = filtered.filter(order => {
           const orderDate = new Date(order.created_at);
           return orderDate >= firstDayOfLastMonth && orderDate <= lastDayOfLastMonth;
         });
-      } else { // Hôm nay và 7 ngày qua
-        const pastDate = new Date(today);
-        pastDate.setDate(pastDate.getDate() - (filterDays - 1));
-
-        filteredOrders = orders.filter(order => {
+      } else if (dateFilter === 'custom' && customDate) {
+        const selectedDate = new Date(customDate);
+        selectedDate.setHours(0, 0, 0, 0);
+        filtered = filtered.filter(order => {
           const orderDate = new Date(order.created_at);
-          return orderDate >= pastDate && orderDate <= today;
+          orderDate.setHours(0, 0, 0, 0);
+          return orderDate.getTime() === selectedDate.getTime();
         });
       }
-
-      setFilteredOrderCount(filteredOrders.length);
-      return filteredOrders;
-    } catch {
-      setFilteredOrderCount(orders.length);
-      return orders;
     }
-  }, [dateFilter]);
+    return filtered;
+  }, [statusFilter, dateFilter, customDate]);
 
-  // Hàm xử lý dữ liệu để hiển thị trong bảng
-  const processOrdersData = useCallback((orders: collectionType[]): collectionType[] => {
-    // Chỉ lọc, không slice
-    const filteredOrders = filterOrdersByDate(orders);
-    return filteredOrders;
-  }, [filterOrdersByDate]);
+  // Danh sách đã lọc để hiển thị
+  const displayedOrders = React.useMemo(() => filterOrders(allOrders), [allOrders, filterOrders]);
 
-  // Cập nhật filteredProductOptions khi không có sản phẩm
+  // Đếm số lượng phiếu đã lọc
   useEffect(() => {
-    if (filteredProductOptions.length === 0 && productOptions.length > 0) {
-      // const message = 'Không tìm thấy sản phẩm nào cho nhà cung cấp này';
-    }
-  }, [filteredProductOptions, productOptions]);
+    setFilteredOrderCount(displayedOrders.length);
+  }, [displayedOrders]);
 
-  // Dùng useMemo để tối ưu hóa các option
-  // const memoizedFilteredOptions = useMemo(() =>
-  //   productOptions.filter(
-  //     option => option.supplier_id === orderForm.supplier_id
-  //   ),
-  //   [productOptions, orderForm.supplier_id]
-  // );
-
-  // Dùng useMemo cho dateFilter options
-  const dateFilterOptions = useMemo(() =>
-    dateFilters.map(filter => ({
-      label: filter.label,
-      value: filter.value
-    })),
-    [dateFilters]
-  );
-
-  // Cập nhật hàm renderDateFilters
-  const renderDateFilters = useCallback((): ReactElement => {
-    return (
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Text className="text-gray-700 font-medium">Lọc theo thời gian:</Text>
-            {filteredOrderCount > 0 && (
-              <div className="bg-blue-100 text-blue-800 text-xs font-medium rounded-full px-2.5 py-1">
-                {filteredOrderCount} phiếu
-              </div>
-            )}
-          </div>
-          <div className="w-60">
-            <SelectDropdown
-              className="bg-white border-blue-200 hover:border-blue-400"
-              options={dateFilterOptions}
-              defaultOptionIndex={getSelectedOptionIndex(
-                dateFilterOptions,
-                dateFilter
-              )}
-              onInputChange={handleChangeDateFilter}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }, [dateFilterOptions, dateFilter, filteredOrderCount, handleChangeDateFilter]);
-
-  // 1. Fetch 1 lần khi mount
-  const fetchOrders = useCallback(async () => {
+  // Hàm fetch danh sách theo filter
+  const fetchOrders = useCallback(async (status = statusFilter, date = dateFilter) => {
     setIsLoading(true);
     try {
-      const orders = await fetchGetCollections<collectionType>(collectionName);
-      // Thiết lập danh sách orders mà không sửa đổi trực tiếp cấu trúc đối tượng
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (date) params.append('date', date);
+      const url = `/api/order-form?${params.toString()}`;
+      const response = await fetch(url);
+      const orders = await response.json();
       setAllOrders(orders);
-      // Xử lý hiển thị mã đơn hàng trong giao diện, không thay đổi cấu trúc dữ liệu
-      const newOrders = orders.map((order) => {
-        // Tạo bản sao đối tượng thay vì chỉnh sửa trực tiếp
-        const orderCode = generateOrderCode(order._id);
-        return {
-          ...order,
-          // Thêm thuộc tính hiển thị mã đơn hàng vào đối tượng hiển thị
-          displayCode: orderCode
-        };
-      });
-      setAllOrders(newOrders as collectionType[]);
     } catch (e) {
       // handle error
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [statusFilter, dateFilter]);
 
+  // Khi nhấn nút Lọc - Di chuyển lên trước renderDateFilters
+  const handleApplyFilter = () => {
+    if (pendingDateFilter === 'custom' && !customDate) {
+      createNotification({
+        id: 0,
+        children: <Text>Vui lòng chọn ngày cụ thể trước khi lọc</Text>,
+        type: ENotificationType.ERROR,
+        isAutoClose: true,
+        title: "Lỗi nhập liệu"
+      });
+      return;
+    }
+
+    setStatusFilter(pendingStatusFilter);
+    setDateFilter(pendingDateFilter);
+    fetchOrders(pendingStatusFilter, pendingDateFilter);
+  };
+
+  // Cập nhật hàm renderDateFilters
+  const renderDateFilters = useCallback((): ReactElement => {
+    return (
+      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 mb-5">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Text className="text-gray-700 font-medium whitespace-nowrap">Lọc phiếu đặt hàng theo:</Text>
+            <div className="w-60">
+              <SelectDropdown
+                className="bg-white border border-gray-200 hover:border-blue-400 shadow-sm transition-all w-full"
+                options={statusFilters}
+                defaultOptionIndex={statusFilters.findIndex(f => f.value === pendingStatusFilter)}
+                onInputChange={e => setPendingStatusFilter(e.target.value)}
+              />
+            </div>
+            {filteredOrderCount > 0 && (
+              <div className="bg-blue-100 text-blue-800 text-xs font-medium rounded-full px-2.5 py-1 ml-2">
+                {filteredOrderCount} phiếu
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center flex-wrap">
+            <div className="w-64">
+              <SelectDropdown
+                className="bg-white border border-gray-200 hover:border-blue-400 shadow-sm transition-all w-full"
+                options={dateFilterOptions}
+                defaultOptionIndex={getSelectedOptionIndex(
+                  dateFilterOptions,
+                  pendingDateFilter
+                )}
+                onInputChange={e => setPendingDateFilter(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 ml-3">
+              {pendingDateFilter === 'custom' ? (
+                <div className="flex items-center">
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={customDate}
+                      onChange={e => setCustomDate(e.target.value)}
+                      className="border border-gray-200 rounded-md px-3 py-2 min-w-[200px] text-lg shadow-sm focus:border-blue-400 focus:outline-none transition-all"
+                      required
+                      placeholder="dd/mm/yyyy"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleApplyFilter}
+                    type={EButtonType.INFO}
+                    className="ml-3 px-5 py-2 font-medium shadow-md hover:shadow-lg transition-all"
+                  >
+                    Lọc
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleApplyFilter}
+                  type={EButtonType.INFO}
+                  className="px-5 py-2 font-medium shadow-md hover:shadow-lg transition-all"
+                >
+                  Lọc
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }, [dateFilterOptions, pendingDateFilter, filteredOrderCount, pendingStatusFilter, customDate, handleApplyFilter, createNotification]);
+
+  // Khi mount lần đầu, fetch mặc định với filter "Chưa hoàn thành" và "Hôm nay"
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(OrderFormStatus.PENDING, '1');
   }, []);
 
   // 3. Lọc và phân trang trên client
   const filteredOrders = useMemo(() => {
     if (!allOrders.length) return [];
+
+    // Lọc theo trạng thái
+    let statusFilteredOrders = allOrders;
+    if (statusFilter === OrderFormStatus.PENDING) {
+      statusFilteredOrders = allOrders.filter(order => order.status === OrderFormStatus.PENDING);
+    } else if (statusFilter === OrderFormStatus.COMPLETED) {
+      statusFilteredOrders = allOrders.filter(order => order.status === OrderFormStatus.COMPLETED);
+    }
+    // Nếu là 'all' thì giữ nguyên
+
     // Lọc theo ngày
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return allOrders.filter(order => {
+    return statusFilteredOrders.filter(order => {
       const orderDate = new Date(order.created_at);
       switch (dateFilter) {
         case '0': return true;
@@ -724,8 +781,7 @@ export default function Product() {
         default: return true;
       }
     });
-  }, [allOrders, dateFilter]);
-
+  }, [allOrders, dateFilter, statusFilter]);
 
   // Reset trang về 1 khi filter thay đổi
   useEffect(() => {
@@ -771,16 +827,12 @@ export default function Product() {
       return;
     }
 
-    // Kiểm tra giá nhập phải lớn hơn 0
     const invalidPrice = orderForm.product_details.some(detail => !detail.input_price || detail.input_price <= 0);
     if (invalidPrice) {
-      // Tìm sản phẩm có giá nhập = 0 để hiển thị thông báo cụ thể hơn
       const zeroPrice = orderForm.product_details.find(detail => detail.input_price === 0);
       const emptyPrice = orderForm.product_details.find(detail => !detail.input_price);
 
-      // Hiển thị thông báo tùy theo loại lỗi
       if (zeroPrice || emptyPrice) {
-        // Lấy tên sản phẩm để hiển thị trong thông báo
         const productWithIssue = zeroPrice || emptyPrice;
         const productName = filteredProductOptions.find(option => option.value === productWithIssue?._id)?.label || 'sản phẩm';
 
@@ -803,31 +855,47 @@ export default function Product() {
 
     try {
       setIsSaving(true);
-      const response = await addCollection(orderForm, collectionName);
 
-      if (response.status === EStatusCode.OK || response.status === EStatusCode.CREATED) {
-        // Cập nhật lại danh sách phiếu đặt hàng
-        const updatedOrders = await fetchGetCollections<collectionType>(collectionName);
-        setAllOrders(updatedOrders);
+      let response;
+
+      if (orderForm._id) {
+        // Cập nhật phiếu đặt hàng hiện có
+        response = await fetch(`/api/order-form/${orderForm._id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            supplier_id: orderForm.supplier_id,
+            product_details: orderForm.product_details,
+            status: orderForm.status,
+          }),
+        });
+      } else {
+        // Tạo phiếu đặt hàng mới
+        response = await addCollection(orderForm, collectionName);
+      }
+
+      if (response.ok || response.status === EStatusCode.OK || response.status === EStatusCode.CREATED) {
+        // Gọi lại fetchOrders để lấy dữ liệu mới nhất và render lại danh sách
+        await fetchOrders();
 
         // Reset form nhưng giữ lại supplier_id
         setOrderForm({
           ...DEFAULT_ORDER_FORM,
           supplier_id: orderForm.supplier_id,
         });
-
+        setIsAddCollectionModalOpen(false);
         createNotification({
           id: 0,
-          children: <Text>Lưu phiếu đặt hàng thành công</Text>,
+          children: <Text>{orderForm._id ? 'Cập nhật' : 'Lưu'} phiếu đặt hàng thành công</Text>,
           type: ENotificationType.SUCCESS,
           isAutoClose: true,
         });
       } else {
-        // Cố gắng đọc thông báo lỗi từ response
         const errorData = await response.json();
         console.error('Error response:', errorData);
 
-        // Kiểm tra nếu lỗi liên quan đến giá nhập
         if (errorData?.details?.includes('giá nhập') ||
           errorData?.message?.includes('giá nhập') ||
           errorData?.message?.includes('input price') ||
@@ -845,7 +913,6 @@ export default function Product() {
     } catch (error) {
       console.error('Error saving order form:', error);
 
-      // Hiển thị thông báo lỗi cụ thể hơn nếu có
       let errorMessage = 'Có lỗi xảy ra khi lưu phiếu đặt hàng';
 
       if (error instanceof Error) {
@@ -865,7 +932,7 @@ export default function Product() {
     } finally {
       setIsSaving(false);
     }
-  }, [orderForm, isSaving, createNotification]);
+  }, [orderForm, isSaving, createNotification, filteredProductOptions, fetchOrders]);
 
   // Hàm định dạng tiền tệ
   const formatInputPrice = (value: number | undefined): string => {
@@ -879,6 +946,13 @@ export default function Product() {
     }
   };
 
+  const isOrderCompleted = orderForm.status === OrderFormStatus.COMPLETED;
+
+  // Wrapper cho setIsAddCollectionModalOpen để đúng kiểu (isOpen: boolean) => boolean
+  const handleSetItemModalOpening = (isOpen: boolean): boolean => {
+    setIsAddCollectionModalOpen(isOpen);
+    return isOpen;
+  };
 
   return (
     <>
@@ -896,19 +970,21 @@ export default function Product() {
         handleOpenModal={handleOpenModal}
         onExitModalForm={onExitModalForm}
         dateFilter={dateFilter}
+        statusFilter={statusFilter}
         renderFilters={renderDateFilters}
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
-        totalItems={filteredOrders.length}
+        itemModalOpening={isAddCollectionModalOpen}
+        setItemModalOpening={handleSetItemModalOpening}
+        displayedItems={displayedOrders}
       >
-        {filteredOrders.length === 0
-          ? <Text>Không có dữ liệu</Text>
-          : <>
-            <Tabs>
-              <TabItem label={`Phiếu đặt hàng`}>
-                <InputSection label={`Nhà cung cấp`} className="mb-6">
+        : <>
+          <Tabs>
+            <TabItem label={`Phiếu đặt hàng`}>
+              <div className="space-y-4">
+                <InputSection label={`Nhà cung cấp`} className="mb-4">
                   <SelectDropdown
-                    className="bg-white border-blue-200 hover:border-blue-400"
+                    className="w-full bg-white border-blue-200 hover:border-blue-400"
                     isLoading={isBusinessLoading}
                     isDisable={isModalReadOnly}
                     options={businessOptions}
@@ -925,13 +1001,13 @@ export default function Product() {
                 </InputSection>
 
                 <div className={styles['product-form-container']}>
-                  <div className={`grid items-center ${styles[`good-receipt-product-table-with-price`]} bg-gradient-to-r from-blue-600 to-blue-500 py-4 px-4 rounded-lg font-medium mb-4 shadow-md text-white`}>
-                    <Text className="font-bold">#</Text>
-                    <Text className="font-bold">Tên sản phẩm</Text>
-                    <Text className="font-bold">Giá nhập (đ)</Text>
-                    <Text className="font-bold">Đơn vị tính</Text>
-                    <Text className="font-bold">Số lượng</Text>
-                    <Text className="font-bold">Thao tác</Text>
+                  <div className={`grid items-center ${styles[`good-receipt-product-table-with-price`]} bg-gradient-to-r from-blue-600 to-blue-500 py-3 px-4 rounded-lg font-medium shadow-md text-white`}>
+                    <Text className="font-bold text-center">#</Text>
+                    <Text className="font-bold text-center">Tên sản phẩm</Text>
+                    <Text className="font-bold text-center">Giá nhập (đ)</Text>
+                    <Text className="font-bold text-center">Đơn vị tính</Text>
+                    <Text className="font-bold text-center">Số lượng</Text>
+                    <Text className="font-bold text-center">Thao tác</Text>
                   </div>
 
                   {filteredProductOptions.length === 0 && orderForm.supplier_id && !isProductLoading && (
@@ -1050,8 +1126,13 @@ export default function Product() {
                   })}
 
                   {/* Nút thêm sản phẩm */}
+                  {isOrderCompleted && (
+                    <div className="text-red-500 font-semibold mb-2">
+                      Phiếu đặt hàng đã hoàn thành, không thể chỉnh sửa!
+                    </div>
+                  )}
                   <Button
-                    isDisable={isModalReadOnly || isProductLoading || isBusinessLoading || filteredProductOptions.length === 0}
+                    isDisable={isOrderCompleted || isModalReadOnly || isProductLoading || isBusinessLoading || filteredProductOptions.length === 0}
                     onClick={handleAddOrderFormProduct}
                     className={`flex items-center justify-center gap-2 mt-6 w-full py-4 rounded-lg shadow-md ${styles['sticky-add-button']} ${filteredProductOptions.length === 0 || isModalReadOnly ?
                       'bg-gray-200 opacity-50 cursor-not-allowed text-gray-500' :
@@ -1063,12 +1144,12 @@ export default function Product() {
                     <Text className="font-medium">Thêm sản phẩm</Text>
                   </Button>
                 </div>
-              </TabItem>
+              </div>
+            </TabItem>
+          </Tabs>
 
-            </Tabs>
-
-            {notificationElements}
-          </>
+          {notificationElements}
+        </>
         }
       </ManagerPage>
     </>

@@ -239,12 +239,40 @@ export const POST = async (req: NextRequest): Promise<NextResponse> => {
   }
 }
 
-export const GET = async (): Promise<NextResponse> =>
-  await getCollectionsApi<collectionType>(
-    collectionName,
-    collectionModel,
-    path
-  );
+export const GET = async (req: NextRequest): Promise<NextResponse> => {
+  await connectToDatabase();
+  try {
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status');
+    const date = searchParams.get('date');
+    const filter: any = {};
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    if (date && date !== '0') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (date === '1') {
+        filter.created_at = { $gte: today };
+      } else if (date === '7') {
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        filter.created_at = { $gte: sevenDaysAgo };
+      } else if (date === '30') {
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        filter.created_at = { $gte: firstDayOfMonth };
+      } else if (date === '60') {
+        const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        filter.created_at = { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth };
+      }
+    }
+    const orders = await OrderFormModel.find(filter).sort({ created_at: -1 });
+    return NextResponse.json(orders, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ message: 'Error fetching order forms', error }, { status: 500 });
+  }
+};
 
 export const DELETE = async (): Promise<NextResponse> =>
   await deleteCollectionsApi<collectionType>(
@@ -252,3 +280,153 @@ export const DELETE = async (): Promise<NextResponse> =>
     collectionModel,
     path
   );
+
+export const PATCH = async (
+  req: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> => {
+  print(`${collectionName} API - PATCH ${collectionName}`, ETerminal.FgYellow);
+
+  try {
+    const orderForm: Partial<collectionType> = await req.json();
+    const id = params.id;
+
+    if (!orderForm.product_details || orderForm.product_details.length === 0) {
+      return NextResponse.json(
+        createErrorMessage(
+          `Failed to update ${collectionName}.`,
+          `Order form must have at least one product.`,
+          path,
+          `Please add products to the order form.`,
+        ),
+        { status: EStatusCode.BAD_REQUEST }
+      );
+    }
+
+    await connectToDatabase();
+
+    // Kiểm tra phiếu đặt hàng tồn tại
+    const existingOrderForm = await collectionModel.findById(id);
+    if (!existingOrderForm) {
+      return NextResponse.json(
+        createErrorMessage(
+          `Failed to update ${collectionName}.`,
+          `The order form with ID '${id}' does not exist.`,
+          path,
+          `Please check if the order form ID is correct.`,
+        ),
+        { status: EStatusCode.NOT_FOUND }
+      );
+    }
+
+    // Kiểm tra giá và số lượng sản phẩm
+    const productsWithIssues = orderForm.product_details.filter(
+      product => !product.input_price || product.input_price <= 0 || !product.quantity || product.quantity <= 0
+    );
+
+    if (productsWithIssues.length > 0) {
+      const productsWithZeroPrice = productsWithIssues.filter(product => product.input_price === 0);
+      if (productsWithZeroPrice.length > 0) {
+        return NextResponse.json(
+          createErrorMessage(
+            `Failed to update ${collectionName}.`,
+            `Sản phẩm có giá nhập bằng 0.`,
+            path,
+            `Vui lòng nhập giá cho tất cả sản phẩm trong phiếu đặt hàng.`,
+          ),
+          { status: EStatusCode.BAD_REQUEST }
+        );
+      }
+    }
+
+    // Kiểm tra ID sản phẩm hợp lệ
+    const productIds = orderForm.product_details.map(detail => detail._id);
+    if (!isIdsValid(productIds)) {
+      return NextResponse.json(
+        createErrorMessage(
+          `Failed to update ${collectionName}.`,
+          `Some product IDs are invalid.`,
+          path,
+          `Please check product IDs.`,
+        ),
+        { status: EStatusCode.UNPROCESSABLE_ENTITY }
+      );
+    }
+
+    // Kiểm tra sản phẩm tồn tại
+    const isProductsExist = await isIdsExist<IProduct>(productIds, ProductModel);
+    if (!isProductsExist) {
+      return NextResponse.json(
+        createErrorMessage(
+          `Failed to update ${collectionName}.`,
+          `Some products do not exist.`,
+          path,
+          `Please check if all products exist.`,
+        ),
+        { status: EStatusCode.NOT_FOUND }
+      );
+    }
+
+    // Kiểm tra đơn vị tính
+    const unitIds = orderForm.product_details.map(detail => detail.unit_id);
+    if (!isIdsValid(unitIds)) {
+      return NextResponse.json(
+        createErrorMessage(
+          `Failed to update ${collectionName}.`,
+          `Some unit IDs are invalid.`,
+          path,
+          `Please check unit IDs.`,
+        ),
+        { status: EStatusCode.UNPROCESSABLE_ENTITY }
+      );
+    }
+
+    const isUnitsExist = await isIdsExist<IUnit>(unitIds, UnitModel);
+    if (!isUnitsExist) {
+      return NextResponse.json(
+        createErrorMessage(
+          `Failed to update ${collectionName}.`,
+          `Some units do not exist.`,
+          path,
+          `Please check if all units exist.`,
+        ),
+        { status: EStatusCode.NOT_FOUND }
+      );
+    }
+
+    // Cập nhật phiếu đặt hàng
+    const updatedOrderForm = await collectionModel.findByIdAndUpdate(
+      id,
+      {
+        ...orderForm,
+        updated_at: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!updatedOrderForm) {
+      return NextResponse.json(
+        createErrorMessage(
+          `Failed to update ${collectionName}.`,
+          `Could not update the order form.`,
+          path,
+          `Please try again later.`,
+        ),
+        { status: EStatusCode.INTERNAL_SERVER_ERROR }
+      );
+    }
+
+    return NextResponse.json(updatedOrderForm, { status: EStatusCode.OK });
+  } catch (error: unknown) {
+    console.error(`Error updating ${collectionName}:`, error);
+    return NextResponse.json(
+      createErrorMessage(
+        `Failed to update ${collectionName}.`,
+        error instanceof Error ? error.message : String(error),
+        path,
+        `Please contact administrator for more information.`,
+      ),
+      { status: EStatusCode.INTERNAL_SERVER_ERROR }
+    );
+  }
+};

@@ -26,10 +26,10 @@
   --button-color: transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  .info, .success, .danger {
-    background: lch(from var(--button-color) calc(l - var(--brightness-different)) c h);
-  }
+:global(:root[data-theme="dark"]) .info,
+:global(:root[data-theme="dark"]) .success,
+:global(:root[data-theme="dark"]) .danger {
+  background: lch(from var(--button-color) calc(l - var(--brightness-different)) c h);
 }
 
 .button:not(.loading) {

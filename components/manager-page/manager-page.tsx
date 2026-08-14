@@ -42,6 +42,7 @@ export interface IManagerPageProps<T extends { _id: string }> {
   additionalButtons?: ReactElement
   additionalProcessing?: (items: T[]) => T[]
   dateFilter?: string
+  statusFilter?: string
   renderFilters?: () => ReactElement
   customHandleAddCollection?: () => Promise<void>
   pageCollection?: ECollectionNames
@@ -127,12 +128,29 @@ export default function ManagerPage<T extends { _id: string }>({
   additionalProcessing,
   renderFilters,
   customHandleAddCollection,
+  itemModalOpening,
+  setItemModalOpening,
+  dateFilter,
+  statusFilter,
 }: Readonly<IManagerPageProps<T>>): ReactElement {
   const translatedCollectionName: string =
     translateCollectionName(collectionName);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isAddCollectionModalOpen, setIsAddCollectionModalOpen] =
-    useState<boolean>(false);
+  const [internalModalOpen, setInternalModalOpen] = useState<boolean>(false);
+  const isAddCollectionModalOpen = typeof itemModalOpening === 'boolean' ? itemModalOpening : internalModalOpen;
+  const setIsAddCollectionModalOpen = setItemModalOpening || setInternalModalOpen;
+  let setIsAddCollectionModalOpenWrapper: React.Dispatch<React.SetStateAction<boolean>>;
+  if (setIsAddCollectionModalOpen === setInternalModalOpen) {
+    setIsAddCollectionModalOpenWrapper = setInternalModalOpen;
+  } else {
+    setIsAddCollectionModalOpenWrapper = (value) => {
+      if (typeof value === 'function') {
+        (setIsAddCollectionModalOpen as React.Dispatch<React.SetStateAction<boolean>>)(value);
+      } else {
+        setIsAddCollectionModalOpen(value);
+      }
+    };
+  }
   const [collections, setCollections] = useState<T[]>([]);
   const [isUpdateCollection, setIsUpdateCollection] = useState<boolean>(false);
   const { createNotification, notificationElements } = useNotificationsHook();
@@ -174,10 +192,10 @@ export default function ManagerPage<T extends { _id: string }>({
     (isReadOnly: boolean = false): void => {
       setIsModalReadonly(!isReadOnly);
       if (isReadOnly)
-        setCollection({ ...defaultCollection })
-      setIsAddCollectionModalOpen((prev: boolean): boolean => handleOpenModal(prev));
+        setCollection({ ...defaultCollection });
+      setIsAddCollectionModalOpen(handleOpenModal(isAddCollectionModalOpen));
     },
-    [setIsModalReadonly],
+    [setIsModalReadonly, setIsAddCollectionModalOpen, handleOpenModal, setCollection, defaultCollection, isAddCollectionModalOpen],
   );
 
   const handleAddCollection = async (): Promise<void> => {
@@ -450,8 +468,8 @@ export default function ManagerPage<T extends { _id: string }>({
       mounted.current = true;
   }, [handleShowMore, isClickShowMore]);
 
-  const tableData = displayedItems || collections;
-
+  // Không lọc lại dữ liệu, chỉ nhận prop displayedItems
+  const tableData = displayedItems !== undefined ? displayedItems : collections;
 
   const managerPage: ReactElement = isLoading
     ? <LoadingScreen></LoadingScreen>
@@ -473,14 +491,14 @@ export default function ManagerPage<T extends { _id: string }>({
           onClickDelete={handleDeleteCollection}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
-          totalItems={totalItems ?? collections.length}
+          totalItems={tableData.length}
         />
 
         <CollectionForm<T>
           collection={collection}
           collectionName={collectionName}
           isModalOpen={isAddCollectionModalOpen}
-          setIsModalOpen={setIsAddCollectionModalOpen}
+          setIsModalOpen={setIsAddCollectionModalOpenWrapper}
           okAction={isModalReadonly
             ? handleClickUpdateCollection
             : isUpdateCollection

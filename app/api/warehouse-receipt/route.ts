@@ -398,12 +398,52 @@ export const POST = async (req: NextRequest): Promise<NextResponse> => {
   }
 };
 
-export const GET = async (): Promise<NextResponse> =>
-  await getCollectionsApi<collectionType>(
-    collectionName,
-    collectionModel,
-    path
-  );
+export const GET = async (req: NextRequest): Promise<NextResponse> => {
+  await connectToDatabase();
+  try {
+    const { searchParams } = new URL(req.url);
+    const date = searchParams.get('date');
+    const customDate = searchParams.get('customDate');
+    const filter: any = {};
+
+    if (date && date !== '0') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (date === 'custom' && customDate) {
+        // Xử lý trường hợp ngày cụ thể
+        const selectedDate = new Date(customDate);
+        const nextDay = new Date(selectedDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+
+        filter.created_at = {
+          $gte: selectedDate,
+          $lt: nextDay
+        };
+      } else if (date === '1') {
+        filter.created_at = { $gte: today };
+      } else if (date === '7') {
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        filter.created_at = { $gte: sevenDaysAgo };
+      } else if (date === '30') {
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        filter.created_at = { $gte: firstDayOfMonth };
+      } else if (date === '60') {
+        const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        filter.created_at = { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth };
+      }
+    }
+
+    console.log('Fetching warehouse receipts with filter:', filter);
+    const receipts = await WarehouseReceiptModel.find(filter).sort({ created_at: -1 });
+    return NextResponse.json(receipts, { status: 200 });
+  } catch (error) {
+    console.error('Error fetching warehouse receipts:', error);
+    return NextResponse.json({ message: 'Error fetching warehouse receipts', error }, { status: 500 });
+  }
+};
 
 export const DELETE = async (): Promise<NextResponse> =>
   await deleteCollectionsApi<collectionType>(

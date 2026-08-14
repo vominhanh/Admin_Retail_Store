@@ -1,9 +1,6 @@
 export const changeTheme = (): void => {
-  if (!window.matchMedia)
-    return;
+  const root: HTMLElement = document.documentElement;
+  const isDark: boolean = root.getAttribute("data-theme") === "dark";
 
-  if ( window.matchMedia('(prefers-color-scheme: dark)').matches ) 
-    document.documentElement.setAttribute("data-theme", "light");
-  else if ( window.matchMedia('(prefers-color-scheme: light)').matches )
-    document.documentElement.setAttribute("data-theme", "dark");
+  root.setAttribute("data-theme", isDark ? "light" : "dark");
 }
