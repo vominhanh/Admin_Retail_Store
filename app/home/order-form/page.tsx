@@ -978,7 +978,7 @@ export default function Product() {
         setItemModalOpening={handleSetItemModalOpening}
         displayedItems={displayedOrders}
       >
-        : <>
+        <>
           <Tabs>
             <TabItem label={`Phiếu đặt hàng`}>
               <div className="space-y-4">
@@ -1150,7 +1150,6 @@ export default function Product() {
 
           {notificationElements}
         </>
-        }
       </ManagerPage>
     </>
   );
